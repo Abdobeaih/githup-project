@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    font-family: 'Cairo', sans-serif;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .hero-gradient {
+    background: linear-gradient(135deg, #041a21 0%, #0a2e3a 50%, #041a21 100%);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #c19553 0%, #a67c3d 100%);
+    transition: all 0.3s ease;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(193,149,83,0.3);
+  }
+
+  .bank-card {
+    background: linear-gradient(145deg, #041a21 0%, #0a2e3a 50%, #041a21 100%);
+    border: 1px solid rgba(193,149,83,0.3);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(4,26,33,0.5), 0 0 0 1px rgba(193,149,83,0.1);
+  }
+
+  .bank-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(193,149,83,0.1) 0%, transparent 70%);
+    border-radius: 50%;
+    transform: translate(50%, -50%);
+  }
+
+  .bank-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 150px;
+    height: 150px;
+    background: radial-gradient(circle, rgba(193,149,83,0.08) 0%, transparent 70%);
+    border-radius: 50%;
+    transform: translate(-30%, 30%);
+  }
+
+  .gold-text {
+    background: linear-gradient(135deg, #c19553 0%, #e8d5b5 50%, #c19553 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .card-shine {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.03) 45%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 55%, transparent 100%);
+    transform: rotate(25deg);
+    transition: all 0.8s ease;
+    pointer-events: none;
+  }
+
+  .bank-card:hover .card-shine {
+    transform: rotate(25deg) translate(20%, 20%);
+  }
+
+  .input-focus:focus {
+    box-shadow: 0 0 0 3px rgba(193,149,83,0.2);
+  }
+
+  .page-transition {
+    animation: fadeIn 0.5s ease-out;
+  }
+}
+
+@layer utilities {
+  .text-shadow {
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+}
