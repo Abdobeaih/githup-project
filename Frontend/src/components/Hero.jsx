@@ -54,7 +54,7 @@ export default function Hero() {
           >
             <div className="relative">
               <img 
-                src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&auto=format&fit=crop" 
+                src="/img-hero.jpeg" 
                 alt={t('hero', 'altText') || 'Freelancer Team'} 
                 className="rounded-3xl shadow-2xl w-full object-cover h-[500px] border border-gold/20"
               />

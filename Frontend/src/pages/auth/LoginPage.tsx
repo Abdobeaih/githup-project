@@ -15,23 +15,29 @@ export const LoginPage: React.FC = () => {
   const location = useLocation()
   const setAuth = useAuthStore((s) => s.setAuth)
 
-  const [role, setRole] = useState<'user' | 'company' | 'admin'>('user')
   const [error, setError] = useState('')
 
   const from = (location.state as any)?.from?.pathname || '/dashboard'
 
   const { register, watch, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '', role: 'user' },
+    defaultValues: { email: '', password: '' },
   })
 
   const onSubmit = async (data: LoginFormData) => {
     try {
       setError('')
-      const res = await authApi.login(data.email, data.password, data.role)
+      const res = await authApi.login(data.email, data.password)
       const { user, token } = res.data.data
-      setAuth(user, token)
-      navigate(from, { replace: true })
+      const role = res.data.data.role || 'user'
+      const userWithRole = { ...user, role }
+      setAuth(userWithRole, token)
+      const redirectMap: Record<string, string> = {
+        admin: '/dashboard/admin',
+        company: '/dashboard/company',
+        user: '/dashboard/user',
+      }
+      navigate(redirectMap[role] || '/dashboard/user', { replace: true })
     } catch (err) {
       setError(handleApiError(err))
     }
@@ -53,22 +59,7 @@ export const LoginPage: React.FC = () => {
             <p className="text-dark/50 text-sm mt-1">Welcome back to Freelancer 360</p>
           </div>
 
-          {/* Role Tabs */}
-          <div className="flex bg-cream/50 rounded-xl p-1 mb-6">
-            {(['user', 'company', 'admin'] as const).map((r) => (
-              <button
-                key={r}
-                onClick={() => { setRole(r); setError('') }}
-                className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all capitalize
-                  ${role === r ? 'bg-white shadow-sm text-dark' : 'text-dark/40 hover:text-dark/70'}`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <input type="hidden" {...register('role')} value={role} />
 
             <Input
               label="Email"
@@ -83,7 +74,7 @@ export const LoginPage: React.FC = () => {
               placeholder="Enter your password"
               error={errors.password?.message}
               value={watch('password')}
-              showStrength
+              showStrength={false}
               className="w-full px-4 py-2.5 rounded-xl border text-sm bg-cream/30 text-dark placeholder-dark/40 border-gold/20 focus:ring-gold/40 focus:border-gold/30 focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               {...register('password')}
             />
@@ -97,15 +88,7 @@ export const LoginPage: React.FC = () => {
             </Button>
           </form>
 
-          {/* Demo Credentials */}
-          <div className="mt-6 p-4 bg-cream/50 rounded-xl">
-            <p className="text-xs font-bold text-dark/40 mb-2">Demo Credentials:</p>
-            <div className="text-xs text-dark/50 space-y-1">
-              <p>User: ahmed@example.com / 123456</p>
-              <p>Company: info@shifa.com / 123456</p>
-              <p>Admin: freelancer360.dev@gmail.com / Abdo$2782</p>
-            </div>
-          </div>
+
 
           <p className="text-center text-sm text-dark/50 mt-6">
             Don't have an account?{' '}

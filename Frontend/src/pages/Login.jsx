@@ -6,13 +6,12 @@ import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { Mail, Lock, ArrowLeft } from 'lucide-react'
 import { PasswordInput } from '../components/ui'
-import { USER_ROLES } from '../types/user'
 
 export default function Login() {
   const { login } = useAuth()
   const { t, lang } = useLanguage()
   const navigate = useNavigate()
-  const [form, setForm] = useState({ email: '', password: '', role: USER_ROLES.USER })
+  const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
@@ -20,10 +19,10 @@ export default function Login() {
   const handleSubmit = (e) => {
     e.preventDefault()
     setError('')
-    const result = login(form.email, form.password, form.role)
+    const result = login(form.email, form.password)
     if (result.success) {
-      if (form.role === USER_ROLES.ADMIN) navigate('/dashboard/admin')
-      else if (form.role === USER_ROLES.COMPANY) navigate('/dashboard/company')
+      if (result.role === 'admin') navigate('/dashboard/admin')
+      else if (result.role === 'company') navigate('/dashboard/company')
       else navigate('/dashboard/user')
     } else {
       setError(t('auth', result.error))
@@ -49,19 +48,6 @@ export default function Login() {
 
             <div className="bg-white/5 backdrop-blur-xl p-8 rounded-3xl border border-gold/20">
               <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Role selector */}
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  {[
-                    { value: USER_ROLES.USER, label: t('login', 'user') },
-                    { value: USER_ROLES.COMPANY, label: t('login', 'company') },
-                    { value: USER_ROLES.ADMIN, label: t('login', 'admin') },
-                  ].map(r => (
-                    <button key={r.value} type="button" onClick={() => setForm({ ...form, role: r.value })}
-                      className={`py-2.5 rounded-xl text-sm font-bold transition-all ${form.role === r.value ? 'bg-gold text-dark' : 'bg-white/10 text-goldLight/60 hover:bg-white/20'}`}>
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
 
                 <div>
                   <label className="block text-goldLight font-semibold mb-2 text-sm">{t('login', 'email')}</label>
@@ -80,6 +66,7 @@ export default function Login() {
                     value={form.password}
                     onChange={handleChange}
                     required
+                    showStrength={false}
                     className="w-full bg-white/90 border-0 rounded-xl px-12 py-3.5 text-dark placeholder-dark/40 outline-none transition-all input-focus"
                     placeholder="••••••"
                   />
@@ -107,13 +94,7 @@ export default function Login() {
                 </p>
               </form>
 
-              {/* Demo credentials */}
-              <div className="mt-6 pt-6 border-t border-gold/10 text-xs text-goldLight/40">
-                <p className="mb-2 font-semibold text-goldLight/60">{t('login', 'demoLabel')}</p>
-                <p>مستخدم: ahmed@example.com / 123456</p>
-                <p>شركة: info@shifa.com / 123456</p>
-                <p>مشرف: freelancer360.dev@gmail.com / Abdo$2782</p>
-              </div>
+
             </div>
           </motion.div>
         </div>

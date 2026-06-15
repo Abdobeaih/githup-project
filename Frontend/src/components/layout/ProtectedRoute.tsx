@@ -21,7 +21,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, roles 
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+    return <Navigate to={`/join?redirect=${encodeURIComponent(location.pathname.slice(1) + location.search)}`} state={{ from: location }} replace />
   }
 
   if (roles && role && !roles.includes(role)) {

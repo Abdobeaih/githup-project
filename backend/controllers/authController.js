@@ -36,58 +36,50 @@ async function createOtp(email, role, code) {
 // ─── POST /api/auth/login ─────────────────────────────────────────
 const login = async (req, res, next) => {
   try {
-    const { email, password, role } = req.body
-    let entity
+    const { email, password } = req.body
 
-    if (role === 'user') {
-      entity = await User.findOne({ email })
-      if (entity && (await entity.matchPassword(password))) {
-        res.json({
-          success: true,
-          data: {
-            user: { id: entity._id, name: entity.name, email: entity.email, phone: entity.phone, nationalId: entity.nationalId, job: entity.job, plan: entity.plan, governorate: entity.governorate, scans: entity.scans, saved: entity.saved, points: entity.points, role: entity.role, isActive: entity.isActive, join_date: entity.createdAt },
-            token: generateToken(entity._id),
-            role: 'user',
-          },
-        })
-      } else {
-        res.status(401)
-        throw new Error('Invalid email or password')
-      }
-    } else if (role === 'company') {
-      entity = await Company.findOne({ email })
-      if (entity && (await entity.matchPassword(password))) {
-        res.json({
-          success: true,
-          data: {
-            user: entity,
-            token: generateToken(entity._id),
-            role: 'company',
-          },
-        })
-      } else {
-        res.status(401)
-        throw new Error('Invalid email or password')
-      }
-    } else if (role === 'admin') {
-      entity = await Admin.findOne({ email })
-      if (entity && (await entity.matchPassword(password))) {
-        res.json({
-          success: true,
-          data: {
-            user: entity,
-            token: generateToken(entity._id),
-            role: 'admin',
-          },
-        })
-      } else {
-        res.status(401)
-        throw new Error('Invalid email or password')
-      }
-    } else {
-      res.status(400)
-      throw new Error('Invalid role')
+    // Try User first
+    let entity = await User.findOne({ email })
+    if (entity && (await entity.matchPassword(password))) {
+      return res.json({
+        success: true,
+        data: {
+          user: { id: entity._id, name: entity.name, email: entity.email, phone: entity.phone, nationalId: entity.nationalId, job: entity.job, plan: entity.plan, governorate: entity.governorate, scans: entity.scans, saved: entity.saved, points: entity.points, role: 'user', isActive: entity.isActive, join_date: entity.createdAt },
+          token: generateToken(entity._id),
+          role: 'user',
+        },
+      })
     }
+
+    // Try Company
+    entity = await Company.findOne({ email })
+    if (entity && (await entity.matchPassword(password))) {
+      return res.json({
+        success: true,
+        data: {
+          user: { ...entity.toObject(), role: 'company' },
+          token: generateToken(entity._id),
+          role: 'company',
+        },
+      })
+    }
+
+    // Try Admin
+    entity = await Admin.findOne({ email })
+    if (entity && (await entity.matchPassword(password))) {
+      return res.json({
+        success: true,
+        data: {
+          user: { ...entity.toObject(), role: 'admin' },
+          token: generateToken(entity._id),
+          role: 'admin',
+        },
+      })
+    }
+
+    // No match in any collection
+    res.status(401)
+    throw new Error('Invalid email or password')
   } catch (error) {
     next(error)
   }

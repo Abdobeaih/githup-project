@@ -17,8 +17,8 @@ import type { SubscriptionPlan, SubscriptionPlanCreatePayload, SubscriptionPlanU
 
 // ─── Auth ────────────────────────────────────────────
 export const authApi = {
-  login: (email: string, password: string, role: string) =>
-    api.post<ApiResponse<{ user: User; token: string }>>('/auth/login', { email, password, role }),
+  login: (email: string, password: string) =>
+    api.post<ApiResponse<{ user: User; token: string; role: string }>>('/auth/login', { email, password }),
   signup: (data: UserCreatePayload) =>
     api.post<ApiResponse<{ user: User; token: string }>>('/auth/register', data),
   logout: () => api.post('/auth/logout'),

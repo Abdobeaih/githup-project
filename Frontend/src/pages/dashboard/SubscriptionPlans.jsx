@@ -207,7 +207,7 @@ export default function SubscriptionPlans() {
       return
     }
     if (!user?.id) {
-      navigate('/login')
+      navigate(`/join?redirect=${encodeURIComponent('/subscriptions/plans')}`)
       return
     }
     const plan = plans.find(p => p.id === planId)

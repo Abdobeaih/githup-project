@@ -234,7 +234,7 @@ export default function MedicalInsurance() {
               <p className="text-xl text-goldLight/80 mb-6">{t(section, 'subtitle')}</p>
               <p className="text-goldLight/70 leading-relaxed mb-8 text-lg">{t(section, 'heroText')}</p>
               <Link
-                to={user?.id ? '/pricing' : '/login'}
+                to={user?.id ? '/pricing' : '/join'}
                 className="btn-primary text-dark px-8 py-4 rounded-2xl font-bold text-lg inline-flex items-center gap-3 shadow-xl shadow-gold/20"
               >
                 <CreditCard size={20} />

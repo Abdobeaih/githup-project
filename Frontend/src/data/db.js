@@ -634,7 +634,7 @@ function seedData() {
         address: 'شارع قصر النيل، وسط البلد، القاهرة',
         phone: '19623',
         rating: 4.3,
-        img_url: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&auto=format&fit=crop',
+        img_url: '/bank-El-Ahly.jpg',
         description: 'أكبر بنك حكومي في مصر يقدم خدمات تأمين مالي وحماية دخل متكاملة.',
         services_offered: ['تأمين على الدخل', 'حساب توفير', 'بطاقات ائتمان', 'قروض شخصية'],
         pricing: [
@@ -656,7 +656,7 @@ function seedData() {
         address: 'شارع محمد فريد، وسط البلد، القاهرة',
         phone: '19888',
         rating: 4.4,
-        img_url: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&auto=format&fit=crop',
+        img_url: '/Bank-masr.jpg',
         description: 'بنك عريق يقدم حلول تأمين مالي مبتكرة للفريلانسر وأصحاب الأعمال الحرة.',
         services_offered: ['تأمين مالي', 'استثمار', 'بطاقات', 'تمويل شخصي'],
         pricing: [
@@ -699,7 +699,7 @@ function seedData() {
         address: 'شارع ١٤ مايو، محطة الرمل، الإسكندرية',
         phone: '19033',
         rating: 4.1,
-        img_url: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=400&auto=format&fit=crop',
+        img_url: '/bank-alx.jpg',
         description: 'بنك رائد في تقديم خدمات التأمين المالي للأفراد والشركات الصغيرة.',
         services_offered: ['تأمين مالي', 'حسابات جارية', 'تمويل مشروعات'],
         pricing: [
@@ -719,7 +719,7 @@ function seedData() {
         address: 'شارع الهرم، المهندسين، الجيزة',
         phone: '19199',
         rating: 4.0,
-        img_url: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=400&auto=format&fit=crop',
+        img_url: '/bank-cairo.jpg',
         description: 'بنك حكومي يقدم خدمات مصرفية شاملة وتأمين مالي بأسعار تنافسية.',
         services_offered: ['تأمين دخل', 'حساب توفير', 'قروض شخصية'],
         pricing: [
@@ -739,7 +739,7 @@ function seedData() {
         address: 'شارع السادات، أسوان',
         phone: '19634',
         rating: 4.2,
-        img_url: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=400&auto=format&fit=crop',
+        img_url: '/bank-iskan.jpg',
         description: 'بنك حكومي يخدم محافظات الصعيد بحلول تمويلية وتأمينية متكاملة.',
         services_offered: ['تأمين مالي', 'تمويل عقاري', 'حسابات توفير'],
         pricing: [

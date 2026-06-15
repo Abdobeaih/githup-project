@@ -51,41 +51,35 @@ export function AuthProvider({ children }) {
     setLoading(false)
   }, [])
 
-  const login = useCallback((email, password, role) => {
-    if (role === USER_ROLES.USER) {
-      const u = findUser(email, password)
-      if (u) {
-        setUser(u)
-        setCompany(null)
-        setAdmin(null)
-        saveSession({ type: USER_ROLES.USER, id: u.id })
-        return { success: true, user: u }
-      }
-      return { error: 'invalid_credentials' }
+  const login = useCallback((email, password) => {
+    // Try User first
+    const u = findUser(email, password)
+    if (u) {
+      setUser(u)
+      setCompany(null)
+      setAdmin(null)
+      saveSession({ type: USER_ROLES.USER, id: u.id })
+      return { success: true, user: u, role: 'user' }
     }
-    if (role === USER_ROLES.COMPANY) {
-      const c = findCompany(email, password)
-      if (c) {
-        setCompany(c)
-        setUser(null)
-        setAdmin(null)
-        saveSession({ type: USER_ROLES.COMPANY, id: c.id })
-        return { success: true, company: c }
-      }
-      return { error: 'invalid_credentials' }
+    // Try Company
+    const c = findCompany(email, password)
+    if (c) {
+      setCompany(c)
+      setUser(null)
+      setAdmin(null)
+      saveSession({ type: USER_ROLES.COMPANY, id: c.id })
+      return { success: true, company: c, role: 'company' }
     }
-    if (role === USER_ROLES.ADMIN) {
-      const a = findAdmin(email, password)
-      if (a) {
-        setAdmin(a)
-        setUser(null)
-        setCompany(null)
-        saveSession({ type: USER_ROLES.ADMIN, email: a.email })
-        return { success: true, admin: a }
-      }
-      return { error: 'invalid_login_data' }
+    // Try Admin
+    const a = findAdmin(email, password)
+    if (a) {
+      setAdmin(a)
+      setUser(null)
+      setCompany(null)
+      saveSession({ type: USER_ROLES.ADMIN, email: a.email })
+      return { success: true, admin: a, role: 'admin' }
     }
-    return { error: 'unknown_role' }
+    return { error: 'invalid_credentials' }
   }, [])
 
   const signup = useCallback(({ name, email, phone, nationalId, job, password, plan, role, governorate }) => {

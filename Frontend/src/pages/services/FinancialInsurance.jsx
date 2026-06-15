@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion } from 'framer-motion'
-import { Check, ArrowLeft, Shield, HelpCircle, CreditCard, Star, Landmark, Building2, FileText, Phone, Mail, MapPin, Edit3, Loader2, AlertCircle } from 'lucide-react'
+import { Check, ArrowLeft, Shield, HelpCircle, CreditCard, Star, Landmark, Building2, FileText, Phone, Mail, MapPin, Edit3, Loader2, AlertCircle, Languages } from 'lucide-react'
 import Breadcrumb from '../../components/Breadcrumb'
 import FAQ from '../../components/FAQ'
 import Modal from '../../components/Modal'
@@ -13,6 +13,7 @@ import { servicesData } from '../../data/servicesData'
 import { getAllBanks, createServiceRequest as createServiceRequestLocal } from '../../data/db'
 import { PLAN_IDS } from '../../types/subscription'
 import { submitServiceRequest } from '../../services/serviceRequestService'
+import translations from '../../data/translations'
 
 function providerImgUrl(name) {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=c19553&color=fff&size=400`
@@ -20,6 +21,9 @@ function providerImgUrl(name) {
 
 function ProviderCard({ provider }) {
   const { td, lang } = useLanguage()
+  const [showEn, setShowEn] = useState(false)
+  const enName = translations.dataTranslations?.banks?.[provider.name]?.name
+  const displayName = showEn && enName ? enName : td('companies', provider.name)
   return (
     <motion.div
       className="bg-white rounded-2xl border border-gold/10 hover:border-gold/30 hover:shadow-lg transition-all overflow-hidden"
@@ -31,7 +35,7 @@ function ProviderCard({ provider }) {
       <div className="h-44 overflow-hidden relative">
         <img
           src={provider.img_url || providerImgUrl(provider.name)}
-          alt={td('companies', provider.name)}
+          alt={displayName}
           className="w-full h-full object-cover"
         />
         {provider.discount_percent && (
@@ -39,9 +43,30 @@ function ProviderCard({ provider }) {
             {provider.discount_percent}% خصم
           </div>
         )}
+        {enName && (
+          <button
+            onClick={(e) => { e.preventDefault(); setShowEn(p => !p) }}
+            className="absolute top-3 left-3 bg-dark/60 hover:bg-dark/80 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 transition-all active:scale-90"
+            title={showEn ? (lang === 'ar' ? 'إظهار الاسم العربي' : 'Show Arabic name') : (lang === 'ar' ? 'إظهار الاسم الإنجليزي' : 'Show English name')}
+          >
+            <Languages size={12} />
+            <span className="text-[10px] font-bold">{showEn ? 'AR' : 'EN'}</span>
+          </button>
+        )}
       </div>
       <div className="p-5">
-        <h4 className="font-bold text-dark text-lg mb-1">{td('companies', provider.name)}</h4>
+        <h4 className="font-bold text-dark text-lg mb-1 flex items-center gap-2">
+          {displayName}
+          {enName && (
+            <button
+              onClick={(e) => { e.preventDefault(); setShowEn(p => !p) }}
+              className="text-gold/50 hover:text-gold transition-colors"
+              title={showEn ? (lang === 'ar' ? 'إظهار الاسم العربي' : 'Show Arabic name') : (lang === 'ar' ? 'إظهار الاسم الإنجليزي' : 'Show English name')}
+            >
+              <Languages size={14} />
+            </button>
+          )}
+        </h4>
         <div className="flex items-center gap-2 text-xs text-dark/60 mb-2">
           <span>{provider.governorate || provider.city}</span>
           {provider.rating && (
@@ -257,7 +282,7 @@ export default function FinancialInsurance() {
               <p className="text-xl text-goldLight/80 mb-6">{t(section, 'subtitle')}</p>
               <p className="text-goldLight/70 leading-relaxed mb-8 text-lg">{t(section, 'heroText')}</p>
 <Link
-  to={user?.id ? '/pricing' : '/login'}
+  to={user?.id ? '/pricing' : '/join'}
   className="btn-primary text-dark px-8 py-4 rounded-2xl font-bold text-lg inline-flex items-center gap-3 shadow-xl shadow-gold/20"
 >
   <CreditCard size={20} />
