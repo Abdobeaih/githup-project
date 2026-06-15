@@ -7,6 +7,7 @@ import FAQ from './FAQ'
 import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import { handleSubscribe } from '../utils/subscribeUtils'
+import { PLAN_IDS } from '../types/subscription'
 
 function StarRating({ rating }) {
   const stars = Math.round(rating)
@@ -29,9 +30,9 @@ const tickerIcons = {
 }
 
 export default function ServiceDetail({ service, ticker, venues }) {
-  const { t, tf, td, lang } = useLanguage()
-  const { isAuthenticated } = useAuth()
-  const navigate = useNavigate()
+const { t, tf, td, lang } = useLanguage()
+const { user } = useAuth()
+const navigate = useNavigate()
 
   if (!service) {
     return (
@@ -96,13 +97,15 @@ export default function ServiceDetail({ service, ticker, venues }) {
               </h1>
               <p className="text-xl text-goldLight/80 mb-6">{t(section, 'subtitle')}</p>
               <p className="text-goldLight/70 leading-relaxed mb-8 text-lg">{t(section, 'heroText')}</p>
-              <button
-                onClick={() => handleSubscribe(navigate, isAuthenticated, { service: section })}
-                className="btn-primary text-dark px-8 py-4 rounded-2xl font-bold text-lg inline-flex items-center gap-3 shadow-xl shadow-gold/20"
-              >
-                <CreditCard size={20} />
-                {t(section, 'cta')}
-              </button>
+{user?.plan !== PLAN_IDS.ELITE && (
+  <button
+    onClick={() => handleSubscribe(navigate, true, { service: section })} // Passing true for isAuthenticated as a fallback
+    className="btn-primary text-dark px-8 py-4 rounded-2xl font-bold text-lg inline-flex items-center gap-3 shadow-xl shadow-gold/20"
+  >
+    <CreditCard size={20} />
+    {t(section, 'cta')}
+  </button>
+)}
             </div>
             {image && (
               <motion.div

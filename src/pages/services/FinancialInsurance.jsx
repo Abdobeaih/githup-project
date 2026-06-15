@@ -8,11 +8,17 @@ import FAQ from '../../components/FAQ'
 import Modal from '../../components/Modal'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { useLanguage } from '../../context/LanguageContext'
+import { useAuth } from '../../context/AuthContext'
 import { servicesData } from '../../data/servicesData'
 import { getAllBanks, createServiceRequest as createServiceRequestLocal } from '../../data/db'
+import { PLAN_IDS } from '../../types/subscription'
 import { submitServiceRequest } from '../../services/serviceRequestService'
 
-function ProviderCard({ provider, onSubscribe }) {
+function providerImgUrl(name) {
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=c19553&color=fff&size=400`
+}
+
+function ProviderCard({ provider }) {
   const { td, lang } = useLanguage()
   return (
     <motion.div
@@ -24,7 +30,7 @@ function ProviderCard({ provider, onSubscribe }) {
     >
       <div className="h-44 overflow-hidden relative">
         <img
-          src={provider.img_url}
+          src={provider.img_url || providerImgUrl(provider.name)}
           alt={td('companies', provider.name)}
           className="w-full h-full object-cover"
         />
@@ -80,20 +86,12 @@ function ProviderCard({ provider, onSubscribe }) {
           )}
         </div>
 
-        <div className="flex gap-2">
-          <Link
-            to={`/services/bank/${provider.id}`}
-            className="flex-1 border-2 border-gold/30 text-gold font-bold py-2.5 px-4 rounded-xl text-sm text-center hover:bg-gold/5 active:scale-[0.98] transition-all"
-          >
-            {lang === 'ar' ? 'التفاصيل' : 'Details'}
-          </Link>
-          <button
-            onClick={onSubscribe}
-            className="flex-[2] bg-gradient-to-r from-gold to-[#a67c3d] text-white font-bold py-2.5 px-4 rounded-xl text-sm hover:shadow-md active:scale-[0.98] transition-all"
-          >
-            {lang === 'ar' ? 'اشترك الآن' : 'Subscribe Now'}
-          </button>
-        </div>
+        <Link
+          to={`/services/bank/${provider.id}`}
+          className="w-full block border-2 border-gold/30 text-gold font-bold py-2.5 px-4 rounded-xl text-sm text-center hover:bg-gold/5 active:scale-[0.98] transition-all"
+        >
+          {lang === 'ar' ? 'التفاصيل' : 'Details'}
+        </Link>
       </div>
     </motion.div>
   )
@@ -103,6 +101,7 @@ export default function FinancialInsurance() {
   const service = servicesData['financial']
   const section = 'financial'
   const { t, tf, td, lang } = useLanguage()
+  const { user } = useAuth()
   const [banks, setBanks] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -257,13 +256,13 @@ export default function FinancialInsurance() {
               </h1>
               <p className="text-xl text-goldLight/80 mb-6">{t(section, 'subtitle')}</p>
               <p className="text-goldLight/70 leading-relaxed mb-8 text-lg">{t(section, 'heroText')}</p>
-              <button
-                onClick={() => openModal(null)}
-                className="btn-primary text-dark px-8 py-4 rounded-2xl font-bold text-lg inline-flex items-center gap-3 shadow-xl shadow-gold/20"
-              >
-                <CreditCard size={20} />
-                {t(section, 'cta')}
-              </button>
+<Link
+  to={user?.id ? '/pricing' : '/login'}
+  className="btn-primary text-dark px-8 py-4 rounded-2xl font-bold text-lg inline-flex items-center gap-3 shadow-xl shadow-gold/20"
+>
+  <CreditCard size={20} />
+  {t(section, 'cta')}
+</Link>
             </div>
             <motion.div
               initial={{ opacity: 0, x: 50 }}
@@ -314,9 +313,9 @@ export default function FinancialInsurance() {
             <div className="w-24 h-1 bg-gradient-to-r from-gold to-goldLight mx-auto rounded-full mt-4" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {banks.map((bank) => (
-              <ProviderCard key={bank.id} provider={bank} onSubscribe={() => openModal(bank)} />
-            ))}
+{banks.map((bank) => (
+  <ProviderCard key={bank.id} provider={bank} />
+))}
           </div>
         </div>
       </section>
@@ -407,10 +406,12 @@ export default function FinancialInsurance() {
             >
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">{t('common', 'ctaTitle')}</h2>
               <p className="text-goldLight/70 max-w-2xl mx-auto mb-8 text-lg">{t('common', 'ctaSubtitle')}</p>
-              <button onClick={() => openModal(null)} className="btn-primary text-dark px-8 py-4 rounded-2xl font-bold text-lg inline-flex items-center gap-3 shadow-xl shadow-gold/20">
-                {t('common', 'ctaButton')}
-                <ArrowLeft size={20} />
-              </button>
+{user?.plan !== PLAN_IDS.ELITE && (
+  <button onClick={() => openModal(null)} className="btn-primary text-dark px-8 py-4 rounded-2xl font-bold text-lg inline-flex items-center gap-3 shadow-xl shadow-gold/20">
+    {t('common', 'ctaButton')}
+    <ArrowLeft size={20} />
+  </button>
+)}
             </motion.div>
           </div>
         </div>

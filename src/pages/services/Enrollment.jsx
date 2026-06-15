@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { servicesData } from '../../data/servicesData'
 import { enrollUserInService, confirmEnrollmentSubscription, findMedicalCenterById, findBankById } from '../../data/db'
+import { PLAN_IDS } from '../../types/subscription'
 
 export default function Enrollment() {
   const { user, isAuthenticated, loading: authLoading } = useAuth()
@@ -32,17 +33,15 @@ export default function Enrollment() {
   const [submitError, setSubmitError] = useState('')
 
   const [form, setForm] = useState({
-    fullName: '',
+    fullName: user?.name || '',
     dateOfBirth: '',
-    phone: '',
+    phone: user?.phone || '',
     agreeDataUse: false,
     agreeTerms: false,
   })
 
   const isValid =
-    form.fullName.trim() !== '' &&
     form.dateOfBirth !== '' &&
-    form.phone.trim().length === 11 &&
     form.agreeDataUse &&
     form.agreeTerms
 
@@ -92,9 +91,9 @@ export default function Enrollment() {
     setSubmitError('')
     try {
       confirmEnrollmentSubscription(enrollment.id, {
-        name: form.fullName.trim(),
+        name: user.name,
         dob: form.dateOfBirth,
-        phone: form.phone.trim(),
+        phone: user.phone,
         dataUseAgree: form.agreeDataUse,
         termsAgree: form.agreeTerms,
       })
@@ -145,7 +144,7 @@ export default function Enrollment() {
   return (
     <>
       <Helmet>
-        <title>{t('common', 'subscriptionTitle')} - Freelancer 360</title>
+        <title>{t('common', 'subscriptionTitle')}</title>
         <meta name="description" content={lang === 'ar' ? `تأكيد اشتراكك في ${t(serviceParam, 'heading')}` : `Confirm your subscription to ${t(serviceParam, 'heading')}`} />
       </Helmet>
 
@@ -204,20 +203,36 @@ export default function Enrollment() {
                 </div>
               )}
 
+              {user?.plan === PLAN_IDS.ELITE ? (
+                <div className="p-8 text-center">
+                  <div className="w-20 h-20 bg-gold/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Shield size={40} className="text-gold" />
+                  </div>
+                  <h3 className="text-xl font-bold text-dark mb-3">
+                    {lang === 'ar' ? 'أنت مشترك في باقة النخبة' : 'You Have the Elite Plan'}
+                  </h3>
+                  <p className="text-dark/60 text-sm leading-relaxed max-w-md mx-auto">
+                    {lang === 'ar'
+                      ? 'جميع الخدمات متاحة لك بالفعل من خلال باقة النخبة. يمكنك متابعة خدماتك من لوحة التحكم.'
+                      : 'All services are already available to you through the Elite plan. You can manage your services from your dashboard.'}
+                  </p>
+                  <Link
+                    to="/dashboard"
+                    className="inline-block mt-6 bg-gradient-to-r from-gold to-[#a67c3d] text-dark px-8 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-gold/30 transition-all"
+                  >
+                    {lang === 'ar' ? 'الذهاب إلى لوحة التحكم' : 'Go to Dashboard'}
+                  </Link>
+                </div>
+              ) : (
               <form onSubmit={handleSubmit} className="p-6 space-y-5">
                 <div>
                   <label className="block text-sm font-bold text-dark mb-1.5 flex items-center gap-2">
                     <FileText size={14} className="text-gold" />
                     {t('common', 'yourFullName')}
                   </label>
-                  <input
-                    type="text"
-                    value={form.fullName}
-                    onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-                    placeholder={t('common', 'fullNamePlaceholder')}
-                    disabled={isSubmitting}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gold/20 bg-cream/30 text-dark placeholder:text-dark/40 focus:outline-none focus:ring-2 focus:ring-gold/40 focus:border-gold/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                  />
+                  <div className="w-full px-4 py-2.5 rounded-xl border border-gold/20 bg-gold/5 text-dark font-medium">
+                    {form.fullName}
+                  </div>
                 </div>
 
                 <div>
@@ -239,17 +254,9 @@ export default function Enrollment() {
                     <Phone size={14} className="text-gold" />
                     {t('common', 'phoneNumber')}
                   </label>
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={11}
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })}
-                    onInput={(e) => { e.target.value = e.target.value.replace(/\D/g, '') }}
-                    placeholder={t('common', 'phonePlaceholder')}
-                    disabled={isSubmitting}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gold/20 bg-cream/30 text-dark placeholder:text-dark/40 focus:outline-none focus:ring-2 focus:ring-gold/40 focus:border-gold/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                  />
+                  <div className="w-full px-4 py-2.5 rounded-xl border border-gold/20 bg-gold/5 text-dark font-medium">
+                    {form.phone}
+                  </div>
                 </div>
 
                 <div className="h-px bg-gold/10" />
@@ -318,6 +325,7 @@ export default function Enrollment() {
                   )}
                 </button>
               </form>
+              )}
             </div>
           </div>
         </div>

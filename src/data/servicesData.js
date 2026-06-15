@@ -11,7 +11,7 @@ export const servicesData = {
   },
   'financial': {
     id: 'financial',
-    image: 'https://images.unsplash.com/photo-1556761101-60d12554acba?w=1200&auto=format&fit=crop',
+    image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&auto=format&fit=crop',
     icon: 'fa-wallet',
     features: [1, 2, 3, 4, 5, 6],
     coverages: [1, 2, 3, 4, 5, 6],

@@ -11,4 +11,7 @@ const userSubscriptionSchema = new mongoose.Schema({
   price: { type: Number, default: 0 },
 }, { timestamps: true })
 
+// Index for fast "current subscription" lookups and subscription status queries
+userSubscriptionSchema.index({ userId: 1, status: 1 })
+
 module.exports = mongoose.model('UserSubscription', userSubscriptionSchema)

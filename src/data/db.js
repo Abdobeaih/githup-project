@@ -656,7 +656,7 @@ function seedData() {
         address: 'شارع محمد فريد، وسط البلد، القاهرة',
         phone: '19888',
         rating: 4.4,
-        img_url: 'https://images.unsplash.com/photo-1567449394863-577a21bdc9fc?w=400&auto=format&fit=crop',
+        img_url: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&auto=format&fit=crop',
         description: 'بنك عريق يقدم حلول تأمين مالي مبتكرة للفريلانسر وأصحاب الأعمال الحرة.',
         services_offered: ['تأمين مالي', 'استثمار', 'بطاقات', 'تمويل شخصي'],
         pricing: [
@@ -2126,8 +2126,13 @@ export function createUserSubscription({ user_id, plan_id, payment_method }) {
     status: 'SUCCESS',
     paid_at: startDate,
   })
+  // Update the user's plan field so AuthContext reflects the upgrade immediately
+  const userIdx = db.users.findIndex(u => u.id === user_id)
+  if (userIdx !== -1) {
+    db.users[userIdx].plan = plan_id
+  }
   save()
-  return { ...sub, plan }
+  return { ...sub, plan, user: db.users[userIdx] }
 }
 
 export function cancelUserSubscription(id) {

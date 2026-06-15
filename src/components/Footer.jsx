@@ -15,8 +15,7 @@ export default function Footer() {
     <footer className="bg-dark text-goldLight/60 py-12 border-t border-gold/20">
       <div className="container mx-auto px-6 text-center">
         <div className="flex items-center justify-center gap-2 mb-4">
-          <img src="/navlogo.png" alt="Freelancers" className="h-14 w-auto" />
-          <span className="text-2xl font-bold text-white font-poppins">{t('footer', 'siteName')}</span>
+          <img src="/Freelancer360.png" alt="Freelancer 360" className="h-16 w-auto" />
         </div>
         <p className="mb-6">{t('footer', 'tagline')}</p>
         <div className="flex justify-center gap-6 mb-8">

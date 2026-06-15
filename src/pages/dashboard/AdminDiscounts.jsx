@@ -206,7 +206,7 @@ export default function AdminDiscounts() {
               <tbody>
                 {usageDetail.map((u, i) => (
                   <tr key={i} className="border-b border-gold/5 hover:bg-gold/5 transition-colors">
-                    <td className="py-3 px-3 text-dark">{u.user?.name || '—'}</td>
+                    <td className="py-3 px-3 text-dark">{td('users', u.user?.name) || '—'}</td>
                     <td className="py-3 px-3 text-dark/70">{dateTimeFormat(u.scanned_at)}</td>
                     <td className="py-3 px-3 text-dark/70 font-mono text-xs">{u.invoice_id}</td>
                     <td className="py-3 px-3 text-dark">{u.product}</td>

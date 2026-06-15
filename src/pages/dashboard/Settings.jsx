@@ -264,7 +264,7 @@ export default function Settings() {
                         <label className="block text-dark font-semibold mb-2 text-sm">{t('settings', 'fullName')}</label>
                         <div className="relative">
                           <User className="absolute right-4 top-1/2 -translate-y-1/2 text-gold/50" size={18} />
-                          <input type="text" name="name" value={!isEditing ? (td('users', profileForm.name) || profileForm.name) : profileForm.name} onChange={handleProfileChange} disabled={!isEditing}
+                          <input type="text" name="name" value={profileForm.name} onChange={handleProfileChange} disabled={!isEditing}
                             className="w-full bg-cream border border-gold/20 rounded-xl px-12 py-3.5 text-dark outline-none focus:border-gold/60 transition-all disabled:opacity-60 disabled:cursor-not-allowed" />
                         </div>
                         {profileErrors.name && <p className="text-red-500 text-xs mt-1">{profileErrors.name}</p>}

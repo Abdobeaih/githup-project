@@ -5,13 +5,14 @@ import { useLanguage } from '../../context/LanguageContext'
 import { useAuth } from '../../context/AuthContext'
 import BackButton from '../../components/BackButton'
 import {
-  getPlans, getPlanFeatures, getFeatures,
+  getPlansWithFeatures, getPlans, getPlanFeatures, getFeatures,
   subscribe, getMySubscription
 } from '../../services/subscriptionsService'
-import { Crown, CheckCircle, Zap, Shield, AlertCircle, RefreshCw, CreditCard, Building2, QrCode, Smartphone, Check, X, ArrowLeft, Phone, Calendar, Hash, User, Landmark } from 'lucide-react'
+import { Crown, CheckCircle, Zap, Shield, AlertCircle, RefreshCw, CreditCard, Building2, QrCode, Smartphone, Check, X, ArrowLeft, Phone, Calendar, Hash, User, Landmark, Stethoscope, PiggyBank, MapPin, Star } from 'lucide-react'
 import Modal from '../../components/Modal'
 import { useNavigate } from 'react-router-dom'
 import { PLAN_IDS } from '../../types/subscription'
+import { enrollUserInService, getAllMedicalCenters, getAllBanks } from '../../data/db'
 
 const planIcons = {
   free: Shield,
@@ -62,7 +63,7 @@ const FALLBACK_PLANS = [
 
 export default function SubscriptionPlans() {
   const { t, lang } = useLanguage()
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const navigate = useNavigate()
   const [plans, setPlans] = useState(FALLBACK_PLANS)
   const [currentPlanId, setCurrentPlanId] = useState(null)
@@ -74,6 +75,13 @@ export default function SubscriptionPlans() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('')
   const [paymentStep, setPaymentStep] = useState(0) // 0 = method selection, 1 = input form
   const [paymentDetails, setPaymentDetails] = useState({})
+
+  // Service enrollment modal (for Elite plan)
+  const [showServiceModal, setShowServiceModal] = useState(false)
+  const [serviceType, setServiceType] = useState('') // 'medical' | 'financial'
+  const [serviceStep, setServiceStep] = useState(0) // 0 = choose type, 1 = choose center/bank
+  const [entitiesList, setEntitiesList] = useState([]) // medical centers or banks list
+  const [selectedEntityId, setSelectedEntityId] = useState(null)
 
   const PAYMENT_METHODS = [
     {
@@ -117,53 +125,81 @@ export default function SubscriptionPlans() {
     setLoading(true)
     setMessage(null)
     let plansLoaded = false
-    try {
-      // Load plans + features
-      const plansRes = await getPlans()
-      const rawPlans = plansRes?.data || []
-      const allFeaturesRes = await getFeatures()
-      const allFeatures = allFeaturesRes?.data || []
 
-      if (rawPlans.length > 0) {
-        // Enrich with features
-        const enriched = await Promise.all(rawPlans.map(async (plan) => {
-          try {
-            const pfRes = await getPlanFeatures(plan.id)
-            const pfData = pfRes?.data || []
-            const features = pfData
-              .map(pf => pf.feature || allFeatures.find(f => f.id === pf.feature_id))
-              .filter(Boolean)
-              .map(f => f.name)
-            return { ...plan, features }
-          } catch {
-            return { ...plan, features: [] }
-          }
+    // Load plans (with features) and subscription in parallel
+    const results = await Promise.allSettled([
+      getPlansWithFeatures(),                         // single call, features pre-populated
+      user?.id ? getMySubscription(user.id) : Promise.resolve(null),
+    ])
+
+    const [plansResult, subResult] = results
+
+    // ── Plans ──
+    if (plansResult.status === 'fulfilled') {
+      const raw = plansResult.value?.data || []
+      if (raw.length > 0) {
+        // Normalise: ensure features is an array of feature-NAME strings,
+        //           and that every plan has a usable id (string)
+        const enriched = raw.map(plan => ({
+          ...plan,
+          id: plan.id || plan._id,
+          features: (plan.features || [])
+            .map(f => (typeof f === 'object' ? f?.name || '' : f))
+            .filter(Boolean),
+          // Keep the popular flag for the UI highlight
+          popular: plan.popular ?? (plan.price > 0 && raw.indexOf(plan) === 1),
         }))
         setPlans(enriched)
         plansLoaded = true
       }
-
-      // Load current subscription
-      if (user?.id) {
-        try {
-          const subRes = await getMySubscription(user.id)
-          const sub = subRes?.data
-          if (sub) setCurrentPlanId(sub.plan_id)
-        } catch { /* ignore — user can still see plans */ }
-      }
-    } catch {
-      // Service failed entirely
     }
 
-    // If no plans loaded at all, use static fallback so UI is never blank
+    // ── Subscription ──
+    if (subResult.status === 'fulfilled') {
+      const sub = subResult.value?.data
+      if (sub) {
+        setCurrentPlanId(sub.plan_id || sub.planId)
+      }
+    }
+
+    // Fallback if nothing loaded
     if (!plansLoaded) {
       setPlans(FALLBACK_PLANS)
       setMessage({ type: 'info', text: 'تم تحميل الباقات من البيانات المحلية' })
     }
+
     setLoading(false)
   }, [user?.id])
 
   useEffect(() => { load() }, [load])
+
+  const resetServiceModal = () => {
+    setServiceType('')
+    setServiceStep(0)
+    setEntitiesList([])
+    setSelectedEntityId(null)
+    setShowServiceModal(false)
+  }
+
+  const handleServiceTypeSelect = (type) => {
+    setServiceType(type)
+    if (type === 'medical') {
+      setEntitiesList(getAllMedicalCenters())
+    } else {
+      setEntitiesList(getAllBanks())
+    }
+    setServiceStep(1)
+  }
+
+  const handleServiceEntitySelect = (entityId) => {
+    setSelectedEntityId(entityId)
+    // Proceed to payment
+    resetServiceModal()
+    setSelectedPaymentMethod('')
+    setPaymentStep(0)
+    setPaymentDetails({})
+    setShowPaymentModal(true)
+  }
 
   const handleSubscribe = (planId) => {
     if (planId === currentPlanId) {
@@ -174,9 +210,16 @@ export default function SubscriptionPlans() {
       navigate('/login')
       return
     }
-    // Show payment gateway for paid plans
     const plan = plans.find(p => p.id === planId)
     if (plan && plan.price > 0) {
+      // Premium plan shows service enrollment selection before payment
+      if (planId === PLAN_IDS.PREMIUM) {
+        setSelectedPlanId(planId)
+        resetServiceModal()
+        setShowServiceModal(true)
+        return
+      }
+      // Elite & other paid plans go directly to payment
       setSelectedPlanId(planId)
       setSelectedPaymentMethod('')
       setPaymentStep(0)
@@ -192,10 +235,19 @@ export default function SubscriptionPlans() {
     setSubscribing(true)
     setMessage(null)
     try {
-      const res = await subscribe({ user_id: user.id, plan_id: planId, payment_method: paymentMethod, payment_details: details })
+      const res = await subscribe({ user_id: user.id, planId, payment_method: paymentMethod, payment_details: details })
       const data = res?.data
       if (data && !data.error) {
         setCurrentPlanId(planId)
+        // Enroll in selected service (Premium only)
+        if (planId === PLAN_IDS.PREMIUM && selectedEntityId) {
+          const enrollPayload = serviceType === 'medical'
+            ? { service_type: 'medical', center_id: selectedEntityId }
+            : { service_type: 'financial', bank_id: selectedEntityId }
+          enrollUserInService(user.id, enrollPayload)
+        }
+        // Other plans (Elite, Free): no service enrollment
+        refreshUser() // sync AuthContext with upgraded plan + enrollment
         setMessage({ type: 'success', text: 'تم الاشتراك بنجاح! مرحباً بك في الباقة الجديدة' })
       } else {
         setMessage({ type: 'error', text: data?.error || 'حدث خطأ أثناء الاشتراك' })
@@ -354,10 +406,131 @@ export default function SubscriptionPlans() {
         </div>
       </section>
 
+      {/* ── Service Enrollment Modal (Elite plan) ── */}
+      <Modal
+        open={showServiceModal}
+        onClose={resetServiceModal}
+        title={lang === 'ar' ? 'اختيار الخدمة' : 'Select Service'}
+        size="md"
+      >
+        {serviceStep === 0 ? (
+          /* Step 1: Choose service type */
+          <div className="space-y-4">
+            <p className="text-dark/60 text-sm text-center">
+              {lang === 'ar'
+                ? 'اختر الخدمة التي ترغب في الاشتراك بها مع باقة النخبة'
+                : 'Choose the service you want to enroll in with the Elite plan'}
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => handleServiceTypeSelect('medical')}
+                className="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-dark/10 bg-cream/30 hover:border-dark hover:bg-dark/5 transition-all text-center"
+              >
+                <div className="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                  <Stethoscope size={28} />
+                </div>
+                <span className="font-bold text-dark">
+                  {lang === 'ar' ? 'التأمين الطبي' : 'Medical Insurance'}
+                </span>
+                <span className="text-dark/40 text-xs">
+                  {lang === 'ar' ? 'اشترك في تغطية طبية شاملة' : 'Comprehensive medical coverage'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleServiceTypeSelect('financial')}
+                className="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-dark/10 bg-cream/30 hover:border-dark hover:bg-dark/5 transition-all text-center"
+              >
+                <div className="w-14 h-14 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
+                  <PiggyBank size={28} />
+                </div>
+                <span className="font-bold text-dark">
+                  {lang === 'ar' ? 'التأمين المالي' : 'Financial Insurance'}
+                </span>
+                <span className="text-dark/40 text-xs">
+                  {lang === 'ar' ? 'حماية دخلك ضد الظروف الطارئة' : 'Protect your income'}
+                </span>
+              </button>
+            </div>
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={resetServiceModal}
+                className="px-6 py-2.5 border-2 border-dark/30 text-dark font-bold rounded-xl hover:bg-dark/5 transition-all text-sm"
+              >
+                {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Step 2: Choose center / bank */
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 mb-2">
+              <button
+                type="button"
+                onClick={() => { setServiceStep(0); setServiceType(''); setSelectedEntityId(null) }}
+                className="p-1.5 rounded-lg hover:bg-dark/10 text-dark transition-all"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <p className="text-dark/60 text-sm">
+                {lang === 'ar'
+                  ? `اختر ${serviceType === 'medical' ? 'المركز الطبي' : 'البنك'} المناسب`
+                  : `Choose the ${serviceType === 'medical' ? 'medical center' : 'bank'}`}
+              </p>
+            </div>
+            <div className="max-h-80 overflow-y-auto space-y-3">
+              {entitiesList.length === 0 ? (
+                <p className="text-center text-dark/40 py-8">
+                  {lang === 'ar' ? 'لا توجد خيارات متاحة' : 'No options available'}
+                </p>
+              ) : (
+                entitiesList.map(entity => {
+                  const isSelected = selectedEntityId === entity.id
+                  return (
+                    <button
+                      key={entity.id}
+                      type="button"
+                      onClick={() => handleServiceEntitySelect(entity.id)}
+                      className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 text-right transition-all ${
+                        isSelected ? 'border-dark bg-dark/5' : 'border-dark/10 bg-cream/30 hover:border-dark/30'
+                      }`}
+                    >
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+                        isSelected ? 'bg-dark text-white' : 'bg-dark/10 text-dark'
+                      }`}>
+                        {serviceType === 'medical' ? <Stethoscope size={20} /> : <Building2 size={20} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-dark text-sm truncate">{entity.name}</p>
+                        <div className="flex items-center gap-2 text-xs text-dark/50 mt-0.5">
+                          <MapPin size={11} />
+                          <span className="truncate">{entity.governorate}</span>
+                          {entity.rating && (
+                            <>
+                              <Star size={11} className="text-amber-500" />
+                              <span>{entity.rating}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div className="w-5 h-5 rounded-full border-2 border-dark/20 flex items-center justify-center shrink-0">
+                        {isSelected ? <Check size={12} className="text-dark" /> : <ArrowLeft size={14} className="text-dark/40" />}
+                      </div>
+                    </button>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* Payment Gateway Modal — Dark theme (second color) */}
       <Modal
         open={showPaymentModal}
-        onClose={() => { if (!submitting) resetPaymentModal() }}
+        onClose={() => { if (!subscribing) resetPaymentModal() }}
         title={
           paymentStep === 0
             ? (lang === 'ar' ? 'اختيار طريقة الدفع' : 'Select Payment Method')

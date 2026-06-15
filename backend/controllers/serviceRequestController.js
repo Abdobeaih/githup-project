@@ -2,7 +2,13 @@ const ServiceRequest = require('../models/ServiceRequest')
 
 const createServiceRequest = async (req, res, next) => {
   try {
-    const { name, phone, email, address, service_id, service_name, provider_id, provider_name, notes } = req.body
+    // Prefer authenticated user data (req.user) over body data — the frontend
+    // locks these fields to the user's account data, but the server-side source
+    // of truth is the authenticated user record when available.
+    const name = req.user?.name || req.body.name
+    const phone = req.user?.phone || req.body.phone
+    const email = req.user?.email || req.body.email
+    const { address, service_id, service_name, provider_id, provider_name, notes } = req.body
 
     if (!name || !phone || !email || !address || !service_id || !service_name) {
       res.status(400)

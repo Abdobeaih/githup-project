@@ -16,7 +16,6 @@ export default function BankCard({ formData }) {
             <span>م</span>
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-goldLight text-sm leading-tight">{t('common', 'siteName')}</span>
             <span className="text-gold/60 text-[10px] tracking-wider">MEMBER CARD</span>
           </div>
         </div>

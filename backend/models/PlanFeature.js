@@ -5,4 +5,7 @@ const planFeatureSchema = new mongoose.Schema({
   feature_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Feature', required: true },
 }, { timestamps: true })
 
+// Index for efficient plan-feature lookups (used in getPlansWithFeatures)
+planFeatureSchema.index({ plan_id: 1, feature_id: 1 })
+
 module.exports = mongoose.model('PlanFeature', planFeatureSchema)

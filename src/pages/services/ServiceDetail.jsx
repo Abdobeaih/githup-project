@@ -63,7 +63,7 @@ export default function ServiceDetail() {
   return (
     <>
       <Helmet>
-        <title>{td(isMedical ? 'medicalCenters' : 'banks', entity.name, 'name')} - Freelancer 360</title>
+        <title>{td(isMedical ? 'medicalCenters' : 'banks', entity.name, 'name')}</title>
       </Helmet>
 
       {/* Hero */}

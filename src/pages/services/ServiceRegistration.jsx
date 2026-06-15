@@ -2,16 +2,19 @@ import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Helmet } from 'react-helmet-async'
-import { Check, ArrowLeft, CreditCard, AlertCircle, Loader2, Building2, Star } from 'lucide-react'
+import { Check, ArrowLeft, CreditCard, AlertCircle, Loader2, Building2, Star, Shield } from 'lucide-react'
 import Breadcrumb from '../../components/Breadcrumb'
+import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { servicesData } from '../../data/servicesData'
 import { submitServiceRequest } from '../../services/serviceRequestService'
 import { createServiceRequest as createServiceRequestLocal } from '../../data/db'
+import { PLAN_IDS } from '../../types/subscription'
 
 export default function ServiceRegistration() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const { user, isAuthenticated } = useAuth()
   const { t, td, lang } = useLanguage()
 
   const serviceId = searchParams.get('service')
@@ -22,9 +25,9 @@ export default function ServiceRegistration() {
   const section = serviceId
 
   const [form, setForm] = useState({
-    name: '',
-    phone: '',
-    email: '',
+    name: user?.name || '',
+    phone: user?.phone || '',
+    email: user?.email || '',
     address: '',
     notes: '',
   })
@@ -40,11 +43,16 @@ export default function ServiceRegistration() {
 
   const validate = () => {
     const errs = {}
-    if (!form.name.trim()) errs.name = lang === 'ar' ? 'الاسم مطلوب' : 'Name is required'
-    if (!form.phone.trim()) errs.phone = lang === 'ar' ? 'رقم الهاتف مطلوب' : 'Phone number is required'
-    else if (!/^\d{11}$/.test(form.phone)) errs.phone = lang === 'ar' ? 'رقم الهاتف يجب أن يتكون من 11 رقمًا' : 'Phone must be exactly 11 digits'
-    if (!form.email.trim()) errs.email = lang === 'ar' ? 'البريد الإلكتروني مطلوب' : 'Email is required'
-    else if (!/\S+@\S+\.\S+/.test(form.email)) errs.email = lang === 'ar' ? 'البريد الإلكتروني غير صالح' : 'Invalid email format'
+    // Name, phone, email are pre-filled from user account — validate silently
+    if (!(user?.name || form.name.trim())) {
+      errs._general = lang === 'ar' ? 'بيانات الحساب غير مكتملة. الرجاء تسجيل الدخول أولاً.' : 'Account data incomplete. Please log in first.'
+    }
+    if (!(user?.phone || form.phone.trim())) {
+      errs._general = lang === 'ar' ? 'رقم الهاتف غير متوفر في الحساب' : 'Phone number not available in account'
+    }
+    if (!(user?.email || form.email.trim())) {
+      errs._general = lang === 'ar' ? 'البريد الإلكتروني غير متوفر في الحساب' : 'Email not available in account'
+    }
     if (!form.address.trim()) errs.address = lang === 'ar' ? 'العنوان مطلوب' : 'Address is required'
     setErrors(errs)
     return Object.keys(errs).length === 0
@@ -70,9 +78,9 @@ export default function ServiceRegistration() {
     setSubmitError('')
 
     const payload = {
-      name: form.name.trim(),
-      phone: form.phone.trim(),
-      email: form.email.trim(),
+      name: user?.name || form.name.trim(),
+      phone: user?.phone || form.phone.trim(),
+      email: user?.email || form.email.trim(),
       address: form.address.trim(),
       service_id: serviceId,
       service_name: service ? t(section, 'heading') : serviceId,
@@ -122,7 +130,7 @@ export default function ServiceRegistration() {
     <>
       <Helmet>
         <title>{t(section, 'title')} - {lang === 'ar' ? 'تقديم طلب' : 'Submit Request'}</title>
-        <meta name="description" content={lang === 'ar' ? `تقديم طلب اشتراك في خدمة ${t(section, 'heading')} من مستقلين` : `Submit a subscription request for ${t(section, 'heading')} service from Freelancer 360`} />
+        <meta name="description" content={lang === 'ar' ? `تقديم طلب اشتراك في خدمة ${t(section, 'heading')} من مستقلين` : `Submit a subscription request for ${t(section, 'heading')}`} />
       </Helmet>
 
       <section className="relative min-h-[60vh] hero-gradient flex items-center pt-32 pb-20 overflow-hidden">
@@ -165,61 +173,61 @@ export default function ServiceRegistration() {
                 </div>
               </div>
 
-              {submitError && (
+              {(submitError || errors._general) && (
                 <div className="mx-6 mt-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
                   <AlertCircle size={20} className="text-red-500 shrink-0" />
-                  <p className="text-red-700 text-sm">{submitError}</p>
+                  <p className="text-red-700 text-sm">{errors._general || submitError}</p>
                 </div>
               )}
 
+              {user?.plan === PLAN_IDS.ELITE ? (
+                <div className="p-8 text-center">
+                  <div className="w-20 h-20 bg-gold/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Shield size={40} className="text-gold" />
+                  </div>
+                  <h3 className="text-xl font-bold text-dark mb-3">
+                    {lang === 'ar' ? 'أنت مشترك في باقة النخبة' : 'You Have the Elite Plan'}
+                  </h3>
+                  <p className="text-dark/60 text-sm leading-relaxed max-w-md mx-auto">
+                    {lang === 'ar'
+                      ? 'جميع الخدمات متاحة لك بالفعل من خلال باقة النخبة. يمكنك متابعة خدماتك من لوحة التحكم.'
+                      : 'All services are already available to you through the Elite plan. You can manage your services from your dashboard.'}
+                  </p>
+                  <Link
+                    to="/dashboard"
+                    className="inline-block mt-6 bg-gradient-to-r from-gold to-[#a67c3d] text-dark px-8 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-gold/30 transition-all"
+                  >
+                    {lang === 'ar' ? 'الذهاب إلى لوحة التحكم' : 'Go to Dashboard'}
+                  </Link>
+                </div>
+              ) : (
               <form onSubmit={handleSubmit} className="p-6 space-y-5">
                 <div>
-                  <label className="block text-dark font-bold mb-1.5 text-sm">
-                    {lang === 'ar' ? 'الاسم الكامل' : 'Full Name'} <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={form.name}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 rounded-xl border ${errors.name ? 'border-red-300 bg-red-50' : 'border-gold/20 bg-cream/50'} focus:outline-none focus:ring-2 focus:ring-gold/30 focus:border-gold/50 transition-all text-dark`}
-                    placeholder={lang === 'ar' ? 'أدخل اسمك الكامل' : 'Enter your full name'}
-                  />
-                  {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
-                </div>
+                    <label className="block text-dark font-bold mb-1.5 text-sm">
+                      {lang === 'ar' ? 'الاسم الكامل' : 'Full Name'} <span className="text-red-500">*</span>
+                    </label>
+                    <div className="w-full px-4 py-3 rounded-xl border border-gold/20 bg-gold/5 text-dark font-medium">
+                      {form.name || (lang === 'ar' ? '(غير متاح)' : '(not available)')}
+                    </div>
+                  </div>
 
                 <div className="grid md:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-dark font-bold mb-1.5 text-sm">
                       {lang === 'ar' ? 'رقم الهاتف' : 'Phone Number'} <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={form.phone}
-                      onChange={handleChange}
-                      onInput={(e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 11) }}
-                      maxLength={11}
-                      inputMode="numeric"
-                      className={`w-full px-4 py-3 rounded-xl border ${errors.phone ? 'border-red-300 bg-red-50' : 'border-gold/20 bg-cream/50'} focus:outline-none focus:ring-2 focus:ring-gold/30 focus:border-gold/50 transition-all text-dark`}
-                      placeholder={lang === 'ar' ? 'أدخل رقم الهاتف' : 'Enter phone number'}
-                    />
-                    {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+                    <div className="w-full px-4 py-3 rounded-xl border border-gold/20 bg-gold/5 text-dark font-medium">
+                      {form.phone || (lang === 'ar' ? '(غير متاح)' : '(not available)')}
+                    </div>
                   </div>
 
                   <div>
                     <label className="block text-dark font-bold mb-1.5 text-sm">
                       {lang === 'ar' ? 'البريد الإلكتروني' : 'Email'} <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={form.email}
-                      onChange={handleChange}
-                      className={`w-full px-4 py-3 rounded-xl border ${errors.email ? 'border-red-300 bg-red-50' : 'border-gold/20 bg-cream/50'} focus:outline-none focus:ring-2 focus:ring-gold/30 focus:border-gold/50 transition-all text-dark`}
-                      placeholder={lang === 'ar' ? 'أدخل البريد الإلكتروني' : 'Enter email address'}
-                    />
-                    {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+                    <div className="w-full px-4 py-3 rounded-xl border border-gold/20 bg-gold/5 text-dark font-medium">
+                      {form.email || (lang === 'ar' ? '(غير متاح)' : '(not available)')}
+                    </div>
                   </div>
                 </div>
 
@@ -282,6 +290,7 @@ export default function ServiceRegistration() {
                   )}
                 </button>
               </form>
+              )}
             </div>
           </div>
         </div>

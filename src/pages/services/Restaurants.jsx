@@ -11,6 +11,8 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import { useLanguage } from '../../context/LanguageContext'
 import { servicesData } from '../../data/servicesData'
 import { getAllRestaurants } from '../../data/db'
+import { PLAN_IDS } from '../../types/subscription'
+
 
 /* ── Marquee component — scrolls all items through, then restarts from beginning ── */
 function Marquee({ children }) {
@@ -72,9 +74,9 @@ function RestaurantCard({ restaurant }) {
 export default function Restaurants() {
   const service = servicesData['restaurants']
   const section = 'restaurants'
-  const { t, tf, td } = useLanguage()
-  const { isAuthenticated } = useAuth()
-  const navigate = useNavigate()
+const { t, tf, td } = useLanguage()
+const { user } = useAuth()
+const navigate = useNavigate()
   const [restaurants, setRestaurants] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -123,13 +125,15 @@ export default function Restaurants() {
               </h1>
               <p className="text-xl text-goldLight/80 mb-6">{t(section, 'subtitle')}</p>
               <p className="text-goldLight/70 leading-relaxed mb-8 text-lg">{t(section, 'heroText')}</p>
-              <button
-                onClick={() => handleSubscribe(navigate, isAuthenticated, { service: 'restaurants' })}
-                className="btn-primary text-dark px-8 py-4 rounded-2xl font-bold text-lg inline-flex items-center gap-3 shadow-xl shadow-gold/20"
-              >
-                <CreditCard size={20} />
-                {t(section, 'cta')}
-              </button>
+{user?.plan !== PLAN_IDS.ELITE && (
+  <button
+    onClick={() => handleSubscribe(navigate, true, { service: 'restaurants' })} // Passing true for isAuthenticated as a fallback
+    className="btn-primary text-dark px-8 py-4 rounded-2xl font-bold text-lg inline-flex items-center gap-3 shadow-xl shadow-gold/20"
+  >
+    <CreditCard size={20} />
+    {t(section, 'cta')}
+  </button>
+)}
             </div>
             <motion.div
               initial={{ opacity: 0, x: 50 }}
@@ -281,10 +285,12 @@ export default function Restaurants() {
             >
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">{t('common', 'ctaTitle')}</h2>
               <p className="text-goldLight/70 max-w-2xl mx-auto mb-8 text-lg">{t('common', 'ctaSubtitle')}</p>
-              <button onClick={() => handleSubscribe(navigate, isAuthenticated, { service: 'restaurants' })} className="btn-primary text-dark px-8 py-4 rounded-2xl font-bold text-lg inline-flex items-center gap-3 shadow-xl shadow-gold/20">
-                {t('common', 'ctaButton')}
-                <ArrowLeft size={20} />
-              </button>
+{user?.plan !== PLAN_IDS.ELITE && (
+  <button onClick={() => handleSubscribe(navigate, true, { service: 'restaurants' })} className="btn-primary text-dark px-8 py-4 rounded-2xl font-bold text-lg inline-flex items-center gap-3 shadow-xl shadow-gold/20">
+    {t('common', 'ctaButton')}
+    <ArrowLeft size={20} />
+  </button>
+)}
             </motion.div>
           </div>
         </div>

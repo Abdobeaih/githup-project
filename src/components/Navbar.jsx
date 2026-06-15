@@ -33,9 +33,8 @@ export default function Navbar() {
   return (
     <nav aria-label="Main navigation" className="fixed top-0 w-full z-50 bg-dark/95 backdrop-blur-xl shadow-lg py-3">
       <div className="container mx-auto px-6 flex justify-between items-center">
-        <Link to="/" className="flex items-center gap-4">
-          <img src="/navlogo.png" alt="Freelancers 360"  className="h-14 w-auto" />
-          <span className="text-3xl font-bold text-white font-poppins">{t('navbar', 'siteName')}</span>
+        <Link to="/" className="flex items-center">
+          <img src="/Freelancer360.png" alt="Freelancer 360" className="h-16 w-auto" />
         </Link>
 
         <div className="hidden md:flex gap-8 items-center">

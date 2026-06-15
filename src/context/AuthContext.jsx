@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { findUser, findCompany, findAdmin, createUser, createCompany, findUserById, findCompanyById, findUserByEmail, findCompanyByEmail, findAdminByEmail, enrollUserInService, resetUserPassword, resetCompanyPassword, resetAdminPassword } from '../data/db'
+import { findUser, findCompany, findAdmin, createUser, createCompany, findUserById, findCompanyById, findUserByEmail, findCompanyByEmail, findAdminByEmail, enrollUserInService } from '../data/db'
 import { USER_ROLES } from '../types/user'
+import api from '../api/axios'
+import { authApi } from '../api/endpoints'
 
 const AuthContext = createContext(null)
 
@@ -86,15 +88,10 @@ export function AuthProvider({ children }) {
     return { error: 'unknown_role' }
   }, [])
 
-  const signup = useCallback(({ name, email, phone, nationalId, job, password, plan, role, governorate, center_id, bank_id }) => {
+  const signup = useCallback(({ name, email, phone, nationalId, job, password, plan, role, governorate }) => {
     if (role === USER_ROLES.USER) {
       const result = createUser({ name, email, phone, nationalId, job, password, plan, governorate })
       if (result.error) return { error: result.error }
-      // Enroll in selected services if elite/premium plan with chosen center/bank
-      if (result.user && (center_id || bank_id)) {
-        if (center_id) enrollUserInService(result.user.id, { service_type: 'medical', center_id })
-        if (bank_id) enrollUserInService(result.user.id, { service_type: 'financial', bank_id })
-      }
       setUser(result.user)
       setCompany(null)
       setAdmin(null)
@@ -121,30 +118,95 @@ export function AuthProvider({ children }) {
   }, [])
 
   // Forgot / Reset Password
-  const forgotPassword = useCallback((email, role) => {
-    if (role === USER_ROLES.USER) {
-      const u = findUserByEmail(email)
-      if (!u) return { error: 'البريد الإلكتروني غير مسجل' }
-      return { success: true, message: 'تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني' }
+  const [sendingOtp, setSendingOtp] = useState(false)
+  const [verifyingOtp, setVerifyingOtp] = useState(false)
+  const [resettingPassword, setResettingPassword] = useState(false)
+
+  // ── forgotPassword ────────────────────────────────────────────
+  // 1. Check local db.js first (that's where user accounts actually live)
+  // 2. If found, call backend API to generate + email the OTP
+  const forgotPassword = useCallback(async (email, role) => {
+    // Local existence check
+    let exists = false
+    if (role === USER_ROLES.USER) exists = !!findUserByEmail(email)
+    else if (role === USER_ROLES.COMPANY) exists = !!findCompanyByEmail(email)
+    else if (role === USER_ROLES.ADMIN) exists = !!findAdminByEmail(email)
+    if (!exists) return { error: 'البريد الإلكتروني غير مسجل' }
+
+    setSendingOtp(true)
+    try {
+      const { data } = await api.post('/auth/forgot-password', { email, role })
+      return { success: true, message: data.message }
+    } catch (err) {
+      const msg = err.response?.data?.message || 'حدث خطأ أثناء إرسال الرمز'
+      return { error: msg }
+    } finally {
+      setSendingOtp(false)
     }
-    if (role === USER_ROLES.COMPANY) {
-      const c = findCompanyByEmail(email)
-      if (!c) return { error: 'البريد الإلكتروني غير مسجل' }
-      return { success: true, message: 'تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني' }
-    }
-    if (role === USER_ROLES.ADMIN) {
-      const a = findAdminByEmail(email)
-      if (!a) return { error: 'البريد الإلكتروني غير مسجل' }
-      return { success: true, message: 'تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني' }
-    }
-    return { error: 'دور غير معروف' }
   }, [])
 
-  const resetPassword = useCallback((email, newPassword, role) => {
-    if (role === USER_ROLES.USER) return resetUserPassword(email, newPassword)
-    if (role === USER_ROLES.COMPANY) return resetCompanyPassword(email, newPassword)
-    if (role === USER_ROLES.ADMIN) return resetAdminPassword(email, newPassword)
-    return { error: 'دور غير معروف' }
+  const verifyOtp = useCallback(async (email, role, code) => {
+    setVerifyingOtp(true)
+    try {
+      const { data } = await api.post('/auth/verify-otp', { email, role, code })
+      return { success: true, message: data.message }
+    } catch (err) {
+      const msg = err.response?.data?.message || 'رمز التحقق غير صحيح'
+      return { error: msg }
+    } finally {
+      setVerifyingOtp(false)
+    }
+  }, [])
+
+  // ── resetPassword ─────────────────────────────────────────────
+  // 1. Call backend to verify OTP and update MongoDB
+  // 2. ALSO update the local db.js so the change takes effect
+  const resetPassword = useCallback(async (email, newPassword, role) => {
+    setResettingPassword(true)
+    try {
+      const { data } = await api.put('/auth/reset-password', { email, password: newPassword, role })
+      // Also update local db.js
+      const { resetUserPassword, resetCompanyPassword, resetAdminPassword } = await import('../data/db')
+      if (role === USER_ROLES.USER) resetUserPassword(email, newPassword)
+      else if (role === USER_ROLES.COMPANY) resetCompanyPassword(email, newPassword)
+      else if (role === USER_ROLES.ADMIN) resetAdminPassword(email, newPassword)
+      return { success: true, message: data.message }
+    } catch (err) {
+      const msg = err.response?.data?.message || 'حدث خطأ أثناء إعادة تعيين كلمة المرور'
+      return { error: msg }
+    } finally {
+      setResettingPassword(false)
+    }
+  }, [])
+
+  // ── Signup Email Verification ────────────────────────────────────
+  const [sendingSignupOtp, setSendingSignupOtp] = useState(false)
+  const [verifyingSignupOtp, setVerifyingSignupOtp] = useState(false)
+
+  const sendSignupOtp = useCallback(async (email, name, role = USER_ROLES.USER) => {
+    setSendingSignupOtp(true)
+    try {
+      const { data } = await authApi.sendSignupOtp(email, name, role)
+      return { success: true, message: data.message }
+    } catch (err) {
+      const msg = err.response?.data?.message || 'حدث خطأ أثناء إرسال رمز التحقق'
+      return { error: msg }
+    } finally {
+      setSendingSignupOtp(false)
+    }
+  }, [])
+
+  const verifySignupEmail = useCallback(async (email, code, role = USER_ROLES.USER) => {
+    setVerifyingSignupOtp(true)
+    try {
+      const { data } = await authApi.verifyEmail(email, code, role)
+      return { success: true, message: data.message }
+    } catch (err) {
+      const msg = err.response?.data?.message || 'رمز التحقق غير صحيح'
+      return { error: msg }
+    } finally {
+      setVerifyingSignupOtp(false)
+    }
   }, [])
 
   // Helper to refresh user data after mutations
@@ -176,8 +238,20 @@ export function AuthProvider({ children }) {
     signup,
     logout,
     refreshUser,
+
+    // Forgot / Reset Password
     forgotPassword,
+    verifyOtp,
     resetPassword,
+    sendingOtp,
+    verifyingOtp,
+    resettingPassword,
+
+    // Signup email verification
+    sendSignupOtp,
+    verifySignupEmail,
+    sendingSignupOtp,
+    verifyingSignupOtp,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -34,7 +34,7 @@ export default function Login() {
     <>
       <Helmet>
         <title>{t('login', 'title')}</title>
-        <meta name="description" content={lang === 'ar' ? 'تسجيل الدخول إلى حسابك في مستقلين للاستفادة من خدمات الفريلانسر الشاملة' : 'Log in to your Freelancer 360 account to access freelance services'} />
+        <meta name="description" content={lang === 'ar' ? 'تسجيل الدخول إلى حسابك في مستقلين للاستفادة من خدمات الفريلانسر الشاملة' : 'Log in to your account to access freelance services'} />
       </Helmet>
       <section className="min-h-screen hero-gradient flex items-center pt-24 pb-12">
         <div className="container mx-auto px-6">

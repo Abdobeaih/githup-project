@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion } from 'framer-motion'
 import { Check, ArrowLeft, Shield, HelpCircle, CreditCard, Star, Building2, FileText, Phone, Mail, MapPin, Edit3, Loader2, AlertCircle } from 'lucide-react'
@@ -8,12 +8,18 @@ import FAQ from '../../components/FAQ'
 import Modal from '../../components/Modal'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { useLanguage } from '../../context/LanguageContext'
+import { useAuth } from '../../context/AuthContext'
 import { servicesData } from '../../data/servicesData'
 import { getAllMedicalCenters } from '../../data/db'
+import { PLAN_IDS } from '../../types/subscription'
 import { submitServiceRequest } from '../../services/serviceRequestService'
 import { createServiceRequest as createServiceRequestLocal } from '../../data/db'
 
-function ProviderCard({ provider, onSubscribe }) {
+function providerImgUrl(name) {
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=c19553&color=fff&size=400`
+}
+
+function ProviderCard({ provider }) {
   const { td, lang } = useLanguage()
   return (
     <motion.div
@@ -25,7 +31,7 @@ function ProviderCard({ provider, onSubscribe }) {
     >
       <div className="h-44 overflow-hidden relative">
         <img
-          src={provider.img_url}
+          src={provider.img_url || providerImgUrl(provider.name)}
           alt={td('companies', provider.name)}
           className="w-full h-full object-cover"
         />
@@ -94,6 +100,8 @@ export default function MedicalInsurance() {
   const service = servicesData['medical']
   const section = 'medical'
   const { t, tf, td, lang } = useLanguage()
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const [centers, setCenters] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -225,13 +233,13 @@ export default function MedicalInsurance() {
               </h1>
               <p className="text-xl text-goldLight/80 mb-6">{t(section, 'subtitle')}</p>
               <p className="text-goldLight/70 leading-relaxed mb-8 text-lg">{t(section, 'heroText')}</p>
-              <button
-                onClick={() => openModal(null)}
+              <Link
+                to={user?.id ? '/pricing' : '/login'}
                 className="btn-primary text-dark px-8 py-4 rounded-2xl font-bold text-lg inline-flex items-center gap-3 shadow-xl shadow-gold/20"
               >
                 <CreditCard size={20} />
                 {t(section, 'cta')}
-              </button>
+              </Link>
             </div>
             <motion.div
               initial={{ opacity: 0, x: 50 }}
@@ -283,7 +291,7 @@ export default function MedicalInsurance() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {centers.map((center) => (
-              <ProviderCard key={center.id} provider={center} onSubscribe={() => openModal(center)} />
+              <ProviderCard key={center.id} provider={center} />
             ))}
           </div>
         </div>
@@ -375,10 +383,12 @@ export default function MedicalInsurance() {
             >
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">{t('common', 'ctaTitle')}</h2>
               <p className="text-goldLight/70 max-w-2xl mx-auto mb-8 text-lg">{t('common', 'ctaSubtitle')}</p>
-              <button onClick={() => openModal(null)} className="btn-primary text-dark px-8 py-4 rounded-2xl font-bold text-lg inline-flex items-center gap-3 shadow-xl shadow-gold/20">
-                {t('common', 'ctaButton')}
-                <ArrowLeft size={20} />
-              </button>
+              {user?.plan !== PLAN_IDS.ELITE && (
+                <button onClick={() => openModal(null)} className="btn-primary text-dark px-8 py-4 rounded-2xl font-bold text-lg inline-flex items-center gap-3 shadow-xl shadow-gold/20">
+                  {t('common', 'ctaButton')}
+                  <ArrowLeft size={20} />
+                </button>
+              )}
             </motion.div>
           </div>
         </div>
@@ -387,12 +397,34 @@ export default function MedicalInsurance() {
       <Modal
         open={showModal}
         onClose={closeModal}
-        title={submitted
-          ? (lang === 'ar' ? 'تم إرسال الطلب' : 'Request Submitted')
-          : (lang === 'ar' ? 'تقديم طلب اشتراك' : 'Submit Subscription Request')}
+        title={user?.plan === PLAN_IDS.ELITE
+          ? (lang === 'ar' ? 'باقة النخبة' : 'Elite Plan')
+          : (submitted
+            ? (lang === 'ar' ? 'تم إرسال الطلب' : 'Request Submitted')
+            : (lang === 'ar' ? 'تقديم طلب اشتراك' : 'Submit Subscription Request'))}
         size="md"
       >
-        {submitted ? (
+        {user?.plan === PLAN_IDS.ELITE ? (
+          <div className="p-8 text-center">
+            <div className="w-20 h-20 bg-gold/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Shield size={40} className="text-gold" />
+            </div>
+            <h3 className="text-xl font-bold text-dark mb-3">
+              {lang === 'ar' ? 'أنت مشترك في باقة النخبة' : 'You Have the Elite Plan'}
+            </h3>
+            <p className="text-dark/60 text-sm leading-relaxed max-w-md mx-auto">
+              {lang === 'ar'
+                ? 'جميع الخدمات متاحة لك بالفعل من خلال باقة النخبة. يمكنك متابعة خدماتك من لوحة التحكم.'
+                : 'All services are already available to you through the Elite plan. You can manage your services from your dashboard.'}
+            </p>
+            <button
+              onClick={closeModal}
+              className="mt-6 bg-gradient-to-r from-gold to-[#a67c3d] text-dark px-8 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-gold/30 transition-all"
+            >
+              {lang === 'ar' ? 'تم' : 'Done'}
+            </button>
+          </div>
+        ) : submitted ? (
           <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
             <motion.div
               initial={{ scale: 0 }}

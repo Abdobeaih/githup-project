@@ -8,8 +8,7 @@ export function buildSubscribeParams(service, provider, providerName) {
 
 export function handleSubscribe(navigate, isAuthenticated, { service, provider, providerName }) {
   const params = buildSubscribeParams(service, provider, providerName)
-  const isInsurance = service === 'financial'
-  const target = isInsurance ? '/services/enroll' : '/services/register'
+  const target = '/services/register'
   if (isAuthenticated) {
     navigate(`${target}?${params.toString()}`)
   } else {

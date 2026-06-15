@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
-import { getGovernorates, getAllMedicalCenters, getAllBanks } from '../data/db'
-import { User, Briefcase, Mail, Lock, ArrowLeft, MapPin, Check, Smartphone, CreditCard, Building2, QrCode, Shield, Zap, Crown, Phone, Globe, Link2, Store, ClipboardList, UserCheck } from 'lucide-react'
+import { getGovernorates } from '../data/db'
+import { User, Briefcase, Mail, Lock, ArrowLeft, MapPin, Check, Smartphone, CreditCard, Building2, QrCode, Shield, Zap, Crown, Phone, Globe, Link2, Store, ClipboardList, UserCheck, KeyRound, Loader2 } from 'lucide-react'
 import { PasswordInput } from '../components/ui'
 import { USER_ROLES } from '../types/user'
 
@@ -22,18 +22,24 @@ const PLAN_PRICES = { free: 0, premium: 99, elite: 199 }
 const PLAN_ICONS  = { free: Shield, premium: Zap, elite: Crown }
 
 export default function Signup() {
-  const { signup } = useAuth()
+  const { signup, sendSignupOtp, verifySignupEmail, sendingSignupOtp, verifyingSignupOtp } = useAuth()
   const { t, ta, td, lang } = useLanguage()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const redirectUrl = searchParams.get('redirect')
   const [governorates, setGovernorates] = useState([])
-  const [medicalCenters, setMedicalCenters] = useState([])
-  const [banks, setBanks] = useState([])
 
   const [role, setRole] = useState(null) // null | USER_ROLES.USER | USER_ROLES.COMPANY
   const [step, setStep] = useState(0)
   const [processing, setProcessing] = useState(false)
+
+  // OTP verification state
+  const [showOtpVerification, setShowOtpVerification] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
+  const [otpError, setOtpError] = useState('')
+  const [otpSuccess, setOtpSuccess] = useState('')
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const otpRefs = useRef([])
 
   const [form, setForm] = useState({
     name: '', email: '', phone: '', nationalId: '', job: '', password: '', plan: 'free',
@@ -44,8 +50,7 @@ export default function Signup() {
     companyBranchName: '', companyContactLink: '', companyWebsite: '',
     // Checkboxes
     hasCommercialReg: false, hasTaxCard: false,
-    // Elite extras
-    selectedMedicalCenter: '', selectedBank: '',
+
   })
   const [paymentMethod, setPaymentMethod] = useState('')
   const [error, setError] = useState('')
@@ -53,8 +58,6 @@ export default function Signup() {
 
   useEffect(() => {
     setGovernorates(getGovernorates())
-    setMedicalCenters(getAllMedicalCenters())
-    setBanks(getAllBanks())
   }, [])
 
   const handleChange = (e) => {
@@ -65,7 +68,6 @@ export default function Signup() {
 
   const isUser = role === USER_ROLES.USER
   const isPaidPlan = form.plan === 'premium' || form.plan === 'elite'
-  const isElite = form.plan === 'elite'
   const specialties = ta('signup', 'specialties')
   const categories = ['medical', 'gym', 'food', 'fun']
 
@@ -113,25 +115,100 @@ export default function Signup() {
     doSignup()
   }
 
-  const doSignup = () => {
+  const doSignup = async () => {
     setProcessing(false)
     const result = signup({
       name: form.name, email: form.email, phone: form.phone, nationalId: form.nationalId, job: form.job, password: form.password,
       plan: form.plan, role: USER_ROLES.USER,
       governorate: form.governorate,
-      center_id: isElite ? form.selectedMedicalCenter || undefined : undefined,
-      bank_id: isElite ? form.selectedBank || undefined : undefined,
     })
     if (result.success) {
-      if (redirectUrl) {
-        const service = searchParams.get('service') || ''
-        const provider = searchParams.get('provider') || ''
-        const providerName = searchParams.get('providerName') || ''
-        navigate(`/${redirectUrl}?service=${service}&provider=${provider}&providerName=${providerName}`, { replace: true })
+      // Send verification OTP email and show OTP screen
+      const otpResult = await sendSignupOtp(form.email, form.name, USER_ROLES.USER)
+      if (otpResult.success) {
+        setOtpSuccess('تم إرسال رمز التحقق إلى بريدك الإلكتروني')
+        setShowOtpVerification(true)
+        setOtpCode('')
+        setOtpError('')
+        startResendCooldown()
+        setTimeout(() => otpRefs.current[0]?.focus(), 100)
       } else {
-        navigate('/dashboard/user')
+        // OTP sending failed but user is created — redirect anyway
+        finishSignup()
       }
     } else setError(result.error)
+  }
+
+  const finishSignup = () => {
+    if (redirectUrl) {
+      const service = searchParams.get('service') || ''
+      const provider = searchParams.get('provider') || ''
+      const providerName = searchParams.get('providerName') || ''
+      navigate(`/${redirectUrl}?service=${service}&provider=${provider}&providerName=${providerName}`, { replace: true })
+    } else {
+      navigate('/dashboard/user')
+    }
+  }
+
+  // OTP input handlers
+  const handleOtpDigit = (index, e) => {
+    const val = e.target.value
+    if (!/^\d?$/.test(val)) return
+    const arr = otpCode.split('')
+    arr[index] = val
+    const newOtp = arr.join('')
+    setOtpCode(newOtp)
+    if (val && index < 5) {
+      otpRefs.current[index + 1]?.focus()
+    }
+  }
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus()
+    }
+  }
+
+  const handleVerifyOtp = async (e) => {
+    e?.preventDefault()
+    setOtpError('')
+    if (otpCode.length !== 6) {
+      setOtpError('يرجى إدخال رمز التحقق المكون من 6 أرقام')
+      return
+    }
+    const result = await verifySignupEmail(form.email, otpCode, USER_ROLES.USER)
+    if (result.success) {
+      setOtpSuccess('تم تأكيد البريد الإلكتروني بنجاح! مرحباً بك في Freelancer360')
+      setTimeout(() => finishSignup(), 1500)
+    } else {
+      setOtpError(result.error)
+    }
+  }
+
+  const startResendCooldown = () => {
+    setResendCooldown(60)
+    const interval = setInterval(() => {
+      setResendCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return
+    setOtpError('')
+    const result = await sendSignupOtp(form.email, form.name, USER_ROLES.USER)
+    if (result.success) {
+      setOtpSuccess('تم إعادة إرسال رمز التحقق')
+      setOtpCode('')
+      startResendCooldown()
+    } else {
+      setOtpError(result.error)
+    }
   }
 
   const handleCompanySubmit = (e) => {
@@ -423,6 +500,63 @@ export default function Signup() {
             </div>
 
             <div className="bg-white/5 backdrop-blur-xl p-8 rounded-3xl border border-gold/20">
+
+              {/* ══════ Email Verification Screen ══════ */}
+              {showOtpVerification ? (
+                <motion.div key="otp-verify"
+                  initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                  className="space-y-5">
+                  <div className="text-center mb-2">
+                    <div className="flex justify-center mb-3">
+                      <div className="w-14 h-14 rounded-full bg-gold/15 flex items-center justify-center">
+                        <KeyRound className="text-gold" size={28} />
+                      </div>
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-1">{lang === 'ar' ? 'تأكيد البريد الإلكتروني' : 'Verify Your Email'}</h3>
+                    <p className="text-goldLight/70 text-sm">{otpSuccess || 'تم إنشاء حسابك! يرجى إدخال رمز التحقق المرسل إلى بريدك الإلكتروني'}</p>
+                    <p className="text-goldLight/50 text-xs mt-1" dir="ltr">{form.email}</p>
+                  </div>
+
+                  {/* 6-digit OTP input */}
+                  <div className="flex justify-center gap-3 rtl:gap-3" dir="ltr">
+                    {[0, 1, 2, 3, 4, 5].map(i => (
+                      <input key={i}
+                        ref={el => otpRefs.current[i] = el}
+                        type="text" inputMode="numeric" maxLength={1}
+                        value={otpCode[i] || ''}
+                        onChange={(e) => handleOtpDigit(i, e)}
+                        onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                        className="w-12 h-14 text-center text-xl font-bold bg-white/90 border-0 rounded-xl text-dark outline-none transition-all input-focus"
+                      />
+                    ))}
+                  </div>
+
+                  {otpError && (
+                    <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                      className="text-red-400 text-sm text-center bg-red-500/10 rounded-xl py-3">
+                      {otpError}
+                    </motion.p>
+                  )}
+
+                  <button type="button" onClick={handleVerifyOtp}
+                    disabled={verifyingSignupOtp || otpCode.length !== 6}
+                    className="w-full bg-gradient-to-r from-gold to-[#a67c3d] text-dark py-4 rounded-xl font-bold text-lg hover:shadow-xl hover:shadow-gold/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                    {verifyingSignupOtp && <Loader2 size={20} className="animate-spin" />}
+                    {verifyingSignupOtp
+                      ? (lang === 'ar' ? 'جاري التحقق...' : 'Verifying...')
+                      : (lang === 'ar' ? 'تأكيد الرمز' : 'Verify Code')}
+                  </button>
+
+                  <div className="text-center">
+                    <button type="button" onClick={handleResendOtp} disabled={resendCooldown > 0}
+                      className="text-gold hover:text-goldLight transition-colors text-sm disabled:opacity-50">
+                      {resendCooldown > 0
+                        ? (lang === 'ar' ? `إعادة الإرسال بعد ${resendCooldown} ثانية` : `Resend in ${resendCooldown}s`)
+                        : (lang === 'ar' ? 'إعادة إرسال الرمز' : 'Resend Code')}
+                    </button>
+                  </div>
+                </motion.div>
+              ) : (
               <AnimatePresence mode="wait" custom={1}>
                 {/* Step 0 — Personal Info */}
                 {step === 0 && (
@@ -517,7 +651,7 @@ export default function Signup() {
                       const Icon = PLAN_ICONS[p]
                       const selected = form.plan === p
                       return (
-                        <button key={p} type="button" onClick={() => setForm({ ...form, plan: p, selectedMedicalCenter: '', selectedBank: '' })}
+                        <button key={p} type="button" onClick={() => setForm({ ...form, plan: p })}
                           className={`w-full flex items-center gap-4 p-5 rounded-2xl border-2 text-right transition-all ${
                             selected ? 'border-gold bg-gold/10' : 'border-white/10 bg-white/5 hover:border-gold/30'
                           }`}>
@@ -542,50 +676,7 @@ export default function Signup() {
                       )
                     })}
 
-                    {/* ── Elite extras: Medical Center + Bank ─────────────── */}
-                    {isElite && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-                        className="space-y-4 pt-2 overflow-hidden">
-                        <div className="border-t border-gold/20 pt-4">
-                          <p className="text-goldLight/70 text-xs text-center mb-4">{t('signup', 'medicalCenterLabel')}</p>
-                          <div className="space-y-4">
-                            {/* Medical Center */}
-                            <div>
-                              <label className="block text-goldLight font-semibold mb-2 text-sm">{t('signup', 'medicalCenterLabel')}</label>
-                              <div className="relative">
-                                <Building2 className="absolute right-4 top-1/2 -translate-y-1/2 text-gold/50" size={18} />
-                                <select name="selectedMedicalCenter" value={form.selectedMedicalCenter} onChange={handleChange}
-                                  className="w-full bg-white/90 border-0 rounded-xl px-12 py-3.5 text-dark outline-none input-focus appearance-none cursor-pointer">
-                                  <option value="">{t('signup', 'selectMedicalCenter')}</option>
-                                  {medicalCenters.map(mc => (
-                                    <option key={mc.id} value={mc.id}>
-                                      {lang === 'ar' ? mc.name : td('medicalCenters', mc.name, 'name')}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
 
-                            {/* Bank */}
-                            <div>
-                              <label className="block text-goldLight font-semibold mb-2 text-sm">{t('signup', 'bankLabel')}</label>
-                              <div className="relative">
-                                <Building2 className="absolute right-4 top-1/2 -translate-y-1/2 text-gold/50" size={18} />
-                                <select name="selectedBank" value={form.selectedBank} onChange={handleChange}
-                                  className="w-full bg-white/90 border-0 rounded-xl px-12 py-3.5 text-dark outline-none input-focus appearance-none cursor-pointer">
-                                  <option value="">{t('signup', 'selectBank')}</option>
-                                  {banks.map(b => (
-                                    <option key={b.id} value={b.id}>
-                                      {lang === 'ar' ? b.name : td('banks', b.name, 'name')}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
                   </motion.div>
                 )}
 
@@ -636,9 +727,10 @@ export default function Signup() {
                   </motion.div>
                 )}
               </AnimatePresence>
+              )}
 
               {/* Error */}
-              {error && (
+              {!showOtpVerification && error && (
                 <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                   className="text-red-400 text-sm text-center bg-red-500/10 rounded-xl py-3 mt-4">
                   {error}
@@ -646,7 +738,7 @@ export default function Signup() {
               )}
 
               {/* Processing overlay */}
-              {processing && (
+              {!showOtpVerification && processing && (
                 <div className="flex flex-col items-center gap-3 mt-6 py-8">
                   <div className="w-10 h-10 border-4 border-gold/30 border-t-gold rounded-full animate-spin" />
                   <p className="text-goldLight text-sm">{t('signup', 'processingPayment')}</p>
@@ -654,7 +746,7 @@ export default function Signup() {
               )}
 
               {/* Navigation buttons */}
-              {!processing && (
+              {!showOtpVerification && !processing && (
                 <div className="flex items-center gap-3 mt-6">
                   {step > 0 && (
                     <button type="button" onClick={handleBack}

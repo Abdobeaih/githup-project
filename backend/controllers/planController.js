@@ -57,4 +57,31 @@ const setPlanFeatures = async (req, res, next) => {
   } catch (error) { next(error) }
 }
 
-module.exports = { getPlans, getPlan, createPlan, updatePlan, deletePlan, getPlanFeatures, setPlanFeatures }
+/**
+ * Get all active plans with their features pre-populated.
+ * Eliminates N+1 — single query for plans + features.
+ */
+const getPlansWithFeatures = async (req, res, next) => {
+  try {
+    const plans = await SubscriptionPlan.find({ isActive: true }).sort('priority');
+    const planFeatures = await PlanFeature.find({
+      plan_id: { $in: plans.map(p => p._id) }
+    }).populate('feature_id');
+
+    // Group features by plan_id
+    const featuresByPlan = {};
+    planFeatures.forEach(pf => {
+      if (!featuresByPlan[pf.plan_id]) featuresByPlan[pf.plan_id] = [];
+      if (pf.feature_id) featuresByPlan[pf.plan_id].push(pf.feature_id);
+    });
+
+    const enriched = plans.map(plan => ({
+      ...plan.toObject(),
+      features: featuresByPlan[plan._id] || [],
+    }));
+
+    res.json({ success: true, data: enriched });
+  } catch (error) { next(error) }
+};
+
+module.exports = { getPlans, getPlan, createPlan, updatePlan, deletePlan, getPlanFeatures, setPlanFeatures, getPlansWithFeatures }

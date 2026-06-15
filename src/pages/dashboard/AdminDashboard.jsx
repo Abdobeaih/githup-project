@@ -29,7 +29,7 @@ import {
 import { PLAN_IDS } from '../../types/subscription'
 
 export default function AdminDashboard() {
-  const { t, lang } = useLanguage()
+  const { t, td, lang } = useLanguage()
   const [stats, setStats] = useState(null)
   const [recentScans, setRecentScans] = useState([])
   const [userDetail, setUserDetail] = useState(null)
@@ -304,7 +304,7 @@ export default function AdminDashboard() {
                       {group.user?.name?.charAt(0) || '?'}
                     </div>
                     <div className="min-w-0">
-                      <span className="font-bold text-dark">{group.user?.name}</span>
+                      <span className="font-bold text-dark">{td('users', group.user?.name)}</span>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-dark/50 mt-0.5">
                         <span>{group.user?.email}</span>
                         {group.user?.phone && <span>{group.user.phone}</span>}

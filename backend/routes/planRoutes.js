@@ -1,8 +1,9 @@
 const express = require('express')
 const router = express.Router()
-const { getPlans, getPlan, createPlan, updatePlan, deletePlan, getPlanFeatures, setPlanFeatures } = require('../controllers/planController')
+const { getPlans, getPlan, createPlan, updatePlan, deletePlan, getPlanFeatures, setPlanFeatures, getPlansWithFeatures } = require('../controllers/planController')
 const { protect, adminOnly } = require('../middleware/authMiddleware')
 
+router.get('/with-features', protect, getPlansWithFeatures)
 router.route('/').get(protect, getPlans).post(protect, adminOnly, createPlan)
 router.get('/:id/features', protect, getPlanFeatures)
 router.put('/:id/features', protect, adminOnly, setPlanFeatures)

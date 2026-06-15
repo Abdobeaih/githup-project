@@ -15,7 +15,7 @@ export default function UserDashboard() {
   const [enrollments, setEnrollments] = useState([])
   const [subModalOpen, setSubModalOpen] = useState(false)
   const [subSelectedEnr, setSubSelectedEnr] = useState(null)
-  const [subForm, setSubForm] = useState({ name: '', dob: '', phone: '', dataUseAgree: false, termsAgree: false })
+  const [subForm, setSubForm] = useState({ dob: '', dataUseAgree: false, termsAgree: false })
 
   useEffect(() => {
     if (user) setEnrollments(getUserEnrollments(user.id))
@@ -28,7 +28,7 @@ export default function UserDashboard() {
 
   const openSubModal = (enr) => {
     setSubSelectedEnr(enr)
-    setSubForm({ name: '', dob: '', phone: '', dataUseAgree: false, termsAgree: false })
+    setSubForm({ dob: '', dataUseAgree: false, termsAgree: false })
     setSubModalOpen(true)
   }
 
@@ -42,9 +42,9 @@ export default function UserDashboard() {
     if (!subSelectedEnr) return
     try {
       confirmEnrollmentSubscription(subSelectedEnr.id, {
-        name: subForm.name,
+        name: user.name,
         dob: subForm.dob,
-        phone: subForm.phone,
+        phone: user.phone,
         dataUseAgree: subForm.dataUseAgree,
         termsAgree: subForm.termsAgree,
       })
@@ -76,7 +76,7 @@ export default function UserDashboard() {
     ? (td('medicalCenters', subSelectedEnr.center?.name, 'name') || td('banks', subSelectedEnr.bank?.name, 'name') || '')
     : ''
 
-  const isFormValid = subForm.name.trim() !== '' && subForm.dob !== '' && subForm.phone.trim().length === 11 && subForm.dataUseAgree && subForm.termsAgree
+  const isFormValid = subForm.dob !== '' && user.phone.trim().length === 11 && subForm.dataUseAgree && subForm.termsAgree
 
   return (
     <>
@@ -252,16 +252,15 @@ export default function UserDashboard() {
               <p className="font-bold text-dark text-lg">{subCompany}</p>
             </div>
 
-            {/* Your Full Name */}
+            {/* Your Full Name (read-only from account) */}
             <div>
               <label className="block text-sm font-bold text-dark mb-1.5 flex items-center gap-2">
                 <FileText size={14} className="text-gold" />
                 {t('common', 'yourFullName')}
               </label>
-              <input type="text" value={subForm.name} onChange={(e) => setSubForm({ ...subForm, name: e.target.value })}
-                placeholder={t('common', 'fullNamePlaceholder')}
-                className="w-full px-4 py-2.5 rounded-xl border border-gold/20 bg-cream/30 text-dark focus:outline-none focus:ring-2 focus:ring-gold/40"
-              />
+              <div className="w-full px-4 py-2.5 rounded-xl border border-gold/20 bg-gold/5 text-dark font-medium">
+                {td('users', user.name)}
+              </div>
             </div>
 
             {/* Date of Birth */}
@@ -275,18 +274,15 @@ export default function UserDashboard() {
               />
             </div>
 
-            {/* Phone Number */}
+            {/* Phone Number (read-only from account) */}
             <div>
               <label className="block text-sm font-bold text-dark mb-1.5 flex items-center gap-2">
                 <Phone size={14} className="text-gold" />
                 {t('common', 'phoneNumber')}
               </label>
-              <input type="tel" value={subForm.phone} onChange={(e) => setSubForm({ ...subForm, phone: e.target.value })}
-                inputMode="numeric" maxLength={11}
-                onInput={(e) => { e.target.value = e.target.value.replace(/\D/g, '') }}
-                placeholder={t('common', 'phonePlaceholder')}
-                className="w-full px-4 py-2.5 rounded-xl border border-gold/20 bg-cream/30 text-dark focus:outline-none focus:ring-2 focus:ring-gold/40"
-              />
+              <div className="w-full px-4 py-2.5 rounded-xl border border-gold/20 bg-gold/5 text-dark font-medium">
+                {user.phone}
+              </div>
             </div>
 
             {/* Checkboxes */}

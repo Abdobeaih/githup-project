@@ -20,10 +20,24 @@ export const authApi = {
   login: (email: string, password: string, role: string) =>
     api.post<ApiResponse<{ user: User; token: string }>>('/auth/login', { email, password, role }),
   signup: (data: UserCreatePayload) =>
-    api.post<ApiResponse<{ user: User; token: string }>>('/auth/signup', data),
+    api.post<ApiResponse<{ user: User; token: string }>>('/auth/register', data),
   logout: () => api.post('/auth/logout'),
   me: () => api.get<ApiResponse<User>>('/auth/me'),
   refreshToken: () => api.post<ApiResponse<{ token: string }>>('/auth/refresh'),
+
+  // Email verification
+  sendSignupOtp: (email: string, name: string, role?: string) =>
+    api.post<ApiResponse<{ message: string }>>('/auth/send-signup-otp', { email, name, role }),
+  verifyEmail: (email: string, code: string, role?: string) =>
+    api.post<ApiResponse<{ message: string }>>('/auth/verify-email', { email, code, role }),
+
+  // Forgot password
+  forgotPassword: (email: string, role: string) =>
+    api.post<ApiResponse<{ message: string }>>('/auth/forgot-password', { email, role }),
+  verifyOtp: (email: string, role: string, code: string) =>
+    api.post<ApiResponse<{ message: string }>>('/auth/verify-otp', { email, role, code }),
+  resetPassword: (email: string, password: string, role: string) =>
+    api.put<ApiResponse<{ message: string }>>('/auth/reset-password', { email, password, role }),
 }
 
 // ─── Users ───────────────────────────────────────────

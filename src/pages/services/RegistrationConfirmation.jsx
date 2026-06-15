@@ -16,7 +16,7 @@ export default function RegistrationConfirmation() {
   return (
     <>
       <Helmet>
-        <title>{lang === 'ar' ? 'تم تقديم الطلب' : 'Request Submitted'} - Freelancer 360</title>
+        <title>{lang === 'ar' ? 'تم تقديم الطلب' : 'Request Submitted'}</title>
       </Helmet>
 
       <section className="min-h-[80vh] flex items-center justify-center bg-cream px-6">
