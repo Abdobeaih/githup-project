@@ -15,4 +15,8 @@ const planSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true })
 
+// Indexes for optimal performance on getPlansWithFeatures queries
+planSchema.index({ isActive: 1, priority: 1 })
+planSchema.index({ isActive: 1 })
+
 module.exports = mongoose.model('SubscriptionPlan', planSchema)

@@ -61,6 +61,7 @@ const Hero = memo(function Hero() {
                 alt={t('hero', 'altText') || 'Freelancer Team'} 
                 width="800" height="500"
                 fetchpriority="high"
+                decoding="async"
                 className="rounded-3xl shadow-2xl w-full object-cover h-[500px] border border-gold/20"
               />
             </picture>

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { useLanguage } from '../../context/LanguageContext'
 import { useAuth } from '../../context/AuthContext'
 import BackButton from '../../components/BackButton'
-import { getMySubscription, cancelSubscription } from '../../services/subscriptionsService'
+import { getMySubscription, getLocalSubscription, cancelSubscription } from '../../services/subscriptionsService'
 import { Crown, Calendar, CreditCard, AlertCircle, CheckCircle, XCircle, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -44,17 +44,30 @@ export default function MySubscription() {
 
   const fetchSub = useCallback(async () => {
     if (!user?.id) return
-    setLoading(true)
-    try {
-      const res = await getMySubscription(user.id)
-      const data = res?.data || null
-      // Auto-detect expired
-      if (data && data.status === SUBSCRIPTION_STATUS.ACTIVE && isExpired(data.end_date)) {
+    const local = getLocalSubscription(user.id)
+    if (local) {
+      const data = { ...local }
+      if (data.status === SUBSCRIPTION_STATUS.ACTIVE && isExpired(data.end_date)) {
         data.status = SUBSCRIPTION_STATUS.EXPIRED
       }
       setSub(data)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
+    try {
+      const res = await getMySubscription(user.id, { preferLocal: false })
+      const data = res?.data || null
+      if (data) {
+        if (data.status === SUBSCRIPTION_STATUS.ACTIVE && isExpired(data.end_date)) {
+          data.status = SUBSCRIPTION_STATUS.EXPIRED
+        }
+        setSub(data)
+      } else if (!local) {
+        setSub(null)
+      }
     } catch {
-      setSub(null)
+      if (!local) setSub(null)
     } finally {
       setLoading(false)
     }

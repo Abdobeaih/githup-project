@@ -7,16 +7,49 @@ const Enrollment = require('../models/Enrollment')
 
 const getDashboardStats = async (req, res, next) => {
   try {
-    const totalUsers = await User.countDocuments()
-    const totalCompanies = await Company.countDocuments()
-    const totalDiscounts = await Discount.countDocuments()
-    const totalScans = await UserScan.countDocuments()
-    const pendingCompanies = await Company.countDocuments({ status: 'pending' })
-    const pendingDiscounts = await Discount.countDocuments({ status: 'pending' })
-    const approvedDiscounts = await Discount.countDocuments({ status: 'approved' })
-    const revenueAgg = await Payment.aggregate([{ $match: { status: 'SUCCESS' } }, { $group: { _id: null, total: { $sum: '$amount' } } }])
-    const totalRevenue = revenueAgg[0]?.total || 0
-    res.json({ success: true, data: { totalUsers, totalCompanies, totalDiscounts, totalScans, pendingCompanies, pendingDiscounts, approvedDiscounts, totalRevenue } })
+    const stats = await User.aggregate([
+      {
+        $facet: {
+          users: [{ $count: 'count' }],
+        },
+      },
+    ]).then(async () => {
+      const companies = await Company.aggregate([
+        {
+          $facet: {
+            total: [{ $count: 'count' }],
+            pending: [{ $match: { status: 'pending' } }, { $count: 'count' }],
+            approved: [{ $match: { status: 'approved' } }, { $count: 'count' }],
+          },
+        },
+      ])
+
+      const discounts = await Discount.aggregate([
+        {
+          $facet: {
+            total: [{ $count: 'count' }],
+            pending: [{ $match: { status: 'pending' } }, { $count: 'count' }],
+            approved: [{ $match: { status: 'approved' } }, { $count: 'count' }],
+          },
+        },
+      ])
+
+      const scans = await UserScan.countDocuments()
+      const revenue = await Payment.aggregate([{ $match: { status: 'SUCCESS' } }, { $group: { _id: null, total: { $sum: '$amount' } } }])
+
+      return {
+        totalUsers: stats[0]?.users[0]?.count || 0,
+        totalCompanies: companies[0]?.total[0]?.count || 0,
+        pendingCompanies: companies[0]?.pending[0]?.count || 0,
+        totalDiscounts: discounts[0]?.total[0]?.count || 0,
+        pendingDiscounts: discounts[0]?.pending[0]?.count || 0,
+        approvedDiscounts: discounts[0]?.approved[0]?.count || 0,
+        totalScans: scans,
+        totalRevenue: revenue[0]?.total || 0,
+      }
+    })
+
+    res.json({ success: true, data: stats })
   } catch (error) { next(error) }
 }
 

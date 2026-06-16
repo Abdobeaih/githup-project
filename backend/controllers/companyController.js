@@ -5,7 +5,7 @@ const APIFeatures = require('../utils/apiFeatures')
 
 const getCompanies = async (req, res, next) => {
   try {
-    const features = new APIFeatures(Company.find(), req.query).filter().search(['name', 'email']).sort().paginate()
+    const features = new APIFeatures(Company.find().lean(), req.query).filter().search(['name', 'email']).sort().paginate()
     const companies = await features.query
     const pagination = await features.count()
     res.json({ success: true, data: companies, ...pagination })
@@ -14,7 +14,7 @@ const getCompanies = async (req, res, next) => {
 
 const getCompany = async (req, res, next) => {
   try {
-    const company = await Company.findById(req.params.id).select('-password')
+    const company = await Company.findById(req.params.id).select('-password').lean()
     if (!company) { res.status(404); throw new Error('Company not found') }
     res.json({ success: true, data: company })
   } catch (error) { next(error) }
@@ -60,17 +60,31 @@ const rejectCompany = async (req, res, next) => {
 
 const getCompanyStats = async (req, res, next) => {
   try {
-    const total = await Company.countDocuments()
-    const pending = await Company.countDocuments({ status: 'pending' })
-    const approved = await Company.countDocuments({ status: 'approved' })
-    res.json({ success: true, data: { total, pending, approved } })
+    const stats = await Company.aggregate([
+      {
+        $facet: {
+          total: [{ $count: 'count' }],
+          pending: [{ $match: { status: 'pending' } }, { $count: 'count' }],
+          approved: [{ $match: { status: 'approved' } }, { $count: 'count' }],
+        },
+      },
+      {
+        $project: {
+          total: { $arrayElemAt: ['$total.count', 0] },
+          pending: { $arrayElemAt: ['$pending.count', 0] },
+          approved: { $arrayElemAt: ['$approved.count', 0] },
+        },
+      },
+    ])
+    const data = stats[0] || { total: 0, pending: 0, approved: 0 }
+    res.json({ success: true, data })
   } catch (error) { next(error) }
 }
 
 // Branches
 const getBranches = async (req, res, next) => {
   try {
-    const branches = await CompanyBranch.find({ company_id: req.params.companyId })
+    const branches = await CompanyBranch.find({ company_id: req.params.companyId }).lean()
     res.json({ success: true, data: branches })
   } catch (error) { next(error) }
 }

@@ -4,7 +4,7 @@ const APIFeatures = require('../utils/apiFeatures')
 
 const getMySubscription = async (req, res, next) => {
   try {
-    const sub = await UserSubscription.findOne({ userId: req.entityId, status: 'ACTIVE' }).populate('planId')
+    const sub = await UserSubscription.findOne({ userId: req.entityId, status: 'ACTIVE' }).populate('planId').lean()
     if (!sub) { return res.json({ success: true, data: null }) }
     res.json({ success: true, data: sub })
   } catch (error) { next(error) }
@@ -12,7 +12,7 @@ const getMySubscription = async (req, res, next) => {
 
 const getSubscriptionHistory = async (req, res, next) => {
   try {
-    const subs = await UserSubscription.find({ userId: req.entityId }).populate('planId').sort('-createdAt')
+    const subs = await UserSubscription.find({ userId: req.entityId }).populate('planId').sort('-createdAt').lean()
     res.json({ success: true, data: subs })
   } catch (error) { next(error) }
 }
@@ -57,7 +57,7 @@ const cancelSubscription = async (req, res, next) => {
 
 const getAllSubscriptions = async (req, res, next) => {
   try {
-    const features = new APIFeatures(UserSubscription.find().populate('userId', 'name email').populate('planId', 'name price'), req.query).filter().sort().paginate()
+    const features = new APIFeatures(UserSubscription.find().populate('userId', 'name email').populate('planId', 'name price').lean(), req.query).filter().sort().paginate()
     const subs = await features.query
     const pagination = await features.count()
     res.json({ success: true, data: subs, ...pagination })

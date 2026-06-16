@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import NotificationBell from './NotificationBell'
 import { USER_ROLES } from '../types/user'
+import { usePrefetchSubscriptionPlans, usePrefetchPricing } from '../hooks/usePrefetchSubscriptionPlans'
 
 const Navbar = memo(function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -12,6 +13,8 @@ const Navbar = memo(function Navbar() {
   const location = useLocation()
   const { user, company, admin, isAuthenticated, role, logout } = useAuth()
   const { lang, toggleLang, t, td } = useLanguage()
+  const prefetchPlans = usePrefetchSubscriptionPlans()
+  const prefetchPricing = usePrefetchPricing()
 
   useEffect(() => {
     setMobileOpen(false)
@@ -34,12 +37,13 @@ const Navbar = memo(function Navbar() {
     <nav aria-label="Main navigation" className="fixed top-0 w-full z-50 bg-dark/95 backdrop-blur-xl shadow-lg py-3">
       <div className="container mx-auto px-6 flex justify-between items-center">
         <Link to="/" className="flex items-center">
-          <img src="/Freelancer360.png" alt="Freelancer 360" width="200" height="64" className="h-16 w-auto" />
+          <img src="/Freelancer360.png" alt="Freelancer 360" width="160" height="51" loading="eager" decoding="async" className="h-16 w-auto" />
         </Link>
 
         <div className="hidden md:flex gap-8 items-center">
           {navItems.map((item, i) => (
             <Link key={i} to={item.href}
+              onMouseEnter={item.href === '/pricing' ? prefetchPricing : undefined}
               className="text-goldLight hover:text-gold font-semibold transition-colors relative group">
               {item.label}
               <span className="absolute -bottom-1 right-0 w-0 h-0.5 bg-gold transition-all group-hover:w-full"></span>
@@ -76,7 +80,10 @@ const Navbar = memo(function Navbar() {
                       className="flex items-center gap-3 px-5 py-2.5 text-goldLight hover:text-gold hover:bg-gold/10 transition-all text-sm">
                       <User size={16} /> {t('navbar', 'profile')}
                     </Link>
-                    <Link to="/subscriptions/plans" onClick={() => setDropdownOpen(false)}
+                    <Link 
+                      to="/subscriptions/plans" 
+                      onMouseEnter={prefetchPlans}
+                      onClick={() => setDropdownOpen(false)}
                       className="flex items-center gap-3 px-5 py-2.5 text-goldLight hover:text-gold hover:bg-gold/10 transition-all text-sm">
                       <CreditCard size={16} /> {t('navbar', 'subscriptions') || 'الباقات'}
                     </Link>
@@ -120,7 +127,14 @@ const Navbar = memo(function Navbar() {
         <div id="mobile-menu" className="md:hidden bg-dark/95 backdrop-blur-xl border-t border-gold/20">
           <div className="container mx-auto px-6 py-4 flex flex-col gap-4">
             {navItems.map((item, i) => (
-              <Link key={i} to={item.href} className="text-goldLight hover:text-gold font-semibold py-2 block">{item.label}</Link>
+              <Link
+                key={i}
+                to={item.href}
+                onMouseEnter={item.href === '/pricing' ? prefetchPricing : undefined}
+                className="text-goldLight hover:text-gold font-semibold py-2 block"
+              >
+                {item.label}
+              </Link>
             ))}
             <button onClick={toggleLang}
               className="text-goldLight hover:text-gold font-semibold py-2 flex items-center gap-2">
@@ -132,7 +146,7 @@ const Navbar = memo(function Navbar() {
                 <Link to="/companies" className="text-goldLight hover:text-gold font-semibold py-2 block">{t('navbar', 'companies')}</Link>
                 {role === USER_ROLES.USER && (
                   <>
-                    <Link to="/subscriptions/plans" className="text-goldLight hover:text-gold font-semibold py-2 block">{t('navbar', 'subscriptions') || 'الباقات'}</Link>
+                    <Link to="/subscriptions/plans" onMouseEnter={prefetchPlans} className="text-goldLight hover:text-gold font-semibold py-2 block">{t('navbar', 'subscriptions') || 'الباقات'}</Link>
                     <Link to="/dashboard/user/settings" className="text-goldLight hover:text-gold font-semibold py-2 block">{t('navbar', 'settings') || 'الإعدادات'}</Link>
                     <Link to="/notifications" className="text-goldLight hover:text-gold font-semibold py-2 block">{t('navbar', 'notifications') || 'الإشعارات'}</Link>
                   </>

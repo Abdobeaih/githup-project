@@ -3,7 +3,7 @@ const APIFeatures = require('../utils/apiFeatures')
 
 const getPayments = async (req, res, next) => {
   try {
-    const features = new APIFeatures(Payment.find().populate('user_id', 'name email'), req.query).filter().sort().paginate()
+    const features = new APIFeatures(Payment.find().populate('user_id', 'name email').lean(), req.query).filter().sort().paginate()
     const payments = await features.query
     const pagination = await features.count()
     res.json({ success: true, data: payments, ...pagination })
@@ -12,7 +12,7 @@ const getPayments = async (req, res, next) => {
 
 const getPayment = async (req, res, next) => {
   try {
-    const payment = await Payment.findById(req.params.id).populate('user_id', 'name email')
+    const payment = await Payment.findById(req.params.id).populate('user_id', 'name email').lean()
     if (!payment) { res.status(404); throw new Error('Payment not found') }
     res.json({ success: true, data: payment })
   } catch (error) { next(error) }
@@ -27,19 +27,35 @@ const createPayment = async (req, res, next) => {
 
 const getMyPayments = async (req, res, next) => {
   try {
-    const payments = await Payment.find({ user_id: req.entityId }).sort('-createdAt')
+    const payments = await Payment.find({ user_id: req.entityId }).sort('-createdAt').lean()
     res.json({ success: true, data: payments })
   } catch (error) { next(error) }
 }
 
 const getPaymentStats = async (req, res, next) => {
   try {
-    const total = await Payment.countDocuments()
-    const success = await Payment.countDocuments({ status: 'SUCCESS' })
-    const failed = await Payment.countDocuments({ status: 'FAILED' })
-    const pending = await Payment.countDocuments({ status: 'PENDING' })
-    const totalRevenue = await Payment.aggregate([{ $match: { status: 'SUCCESS' } }, { $group: { _id: null, total: { $sum: '$amount' } } }])
-    res.json({ success: true, data: { total, success, failed, pending, totalRevenue: totalRevenue[0]?.total || 0 } })
+    const stats = await Payment.aggregate([
+      {
+        $facet: {
+          total: [{ $count: 'count' }],
+          success: [{ $match: { status: 'SUCCESS' } }, { $count: 'count' }],
+          failed: [{ $match: { status: 'FAILED' } }, { $count: 'count' }],
+          pending: [{ $match: { status: 'PENDING' } }, { $count: 'count' }],
+          totalRevenue: [{ $match: { status: 'SUCCESS' } }, { $group: { _id: null, total: { $sum: '$amount' } } }],
+        },
+      },
+      {
+        $project: {
+          total: { $arrayElemAt: ['$total.count', 0] },
+          success: { $arrayElemAt: ['$success.count', 0] },
+          failed: { $arrayElemAt: ['$failed.count', 0] },
+          pending: { $arrayElemAt: ['$pending.count', 0] },
+          totalRevenue: { $arrayElemAt: ['$totalRevenue.total', 0] },
+        },
+      },
+    ])
+    const data = stats[0] || { total: 0, success: 0, failed: 0, pending: 0, totalRevenue: 0 }
+    res.json({ success: true, data })
   } catch (error) { next(error) }
 }
 

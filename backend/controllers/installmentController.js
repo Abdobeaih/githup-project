@@ -2,14 +2,14 @@ const Installment = require('../models/Installment')
 
 const getInstallments = async (req, res, next) => {
   try {
-    const installments = await Installment.find().populate('user_id', 'name email').sort('-createdAt')
+    const installments = await Installment.find().populate('user_id', 'name email').sort('-createdAt').lean()
     res.json({ success: true, data: installments })
   } catch (error) { next(error) }
 }
 
 const getMyInstallments = async (req, res, next) => {
   try {
-    const installments = await Installment.find({ user_id: req.entityId }).sort('-createdAt')
+    const installments = await Installment.find({ user_id: req.entityId }).sort('-createdAt').lean()
     res.json({ success: true, data: installments })
   } catch (error) { next(error) }
 }

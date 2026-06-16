@@ -5,7 +5,7 @@ const APIFeatures = require('../utils/apiFeatures')
 
 const getDiscounts = async (req, res, next) => {
   try {
-    const features = new APIFeatures(Discount.find().populate('company_id', 'name email category'), req.query).filter().search(['name', 'description']).sort().paginate()
+    const features = new APIFeatures(Discount.find().populate('company_id', 'name email category').lean(), req.query).filter().search(['name', 'description']).sort().paginate()
     const discounts = await features.query
     const pagination = await features.count()
     res.json({ success: true, data: discounts, ...pagination })
@@ -14,7 +14,7 @@ const getDiscounts = async (req, res, next) => {
 
 const getDiscount = async (req, res, next) => {
   try {
-    const discount = await Discount.findById(req.params.id).populate('company_id', 'name email category phone city')
+    const discount = await Discount.findById(req.params.id).populate('company_id', 'name email category phone city').lean()
     if (!discount) { res.status(404); throw new Error('Discount not found') }
     res.json({ success: true, data: discount })
   } catch (error) { next(error) }

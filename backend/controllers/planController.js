@@ -4,9 +4,13 @@ const APIFeatures = require('../utils/apiFeatures')
 
 const getPlans = async (req, res, next) => {
   try {
-    const features = new APIFeatures(SubscriptionPlan.find(), req.query).filter().sort().paginate()
+    const features = new APIFeatures(
+      SubscriptionPlan.find({ isActive: true }).lean(),
+      req.query
+    ).filter().sort().paginate()
     const plans = await features.query
     const pagination = await features.count()
+    res.set('Cache-Control', 'public, max-age=300')
     res.json({ success: true, data: plans, ...pagination })
   } catch (error) { next(error) }
 }
@@ -43,8 +47,9 @@ const deletePlan = async (req, res, next) => {
 
 const getPlanFeatures = async (req, res, next) => {
   try {
-    const links = await PlanFeature.find({ plan_id: req.params.id }).populate('feature_id')
-    res.json({ success: true, data: links.map(l => l.feature_id) })
+    const links = await PlanFeature.find({ plan_id: req.params.id }).populate('feature_id', 'name nameAr').lean()
+    res.set('Cache-Control', 'public, max-age=300')
+    res.json({ success: true, data: links.map(l => l.feature_id).filter(Boolean) })
   } catch (error) { next(error) }
 }
 
@@ -59,29 +64,96 @@ const setPlanFeatures = async (req, res, next) => {
 
 /**
  * Get all active plans with their features pre-populated.
- * Eliminates N+1 — single query for plans + features.
+ * Single aggregation pipeline — one DB round-trip instead of two.
  */
 const getPlansWithFeatures = async (req, res, next) => {
   try {
-    const plans = await SubscriptionPlan.find({ isActive: true }).sort('priority');
-    const planFeatures = await PlanFeature.find({
-      plan_id: { $in: plans.map(p => p._id) }
-    }).populate('feature_id');
-
-    // Group features by plan_id
-    const featuresByPlan = {};
-    planFeatures.forEach(pf => {
-      if (!featuresByPlan[pf.plan_id]) featuresByPlan[pf.plan_id] = [];
-      if (pf.feature_id) featuresByPlan[pf.plan_id].push(pf.feature_id);
-    });
+    const plans = await SubscriptionPlan.aggregate([
+      { $match: { isActive: true } },
+      { $sort: { priority: 1 } },
+      {
+        $lookup: {
+          from: 'planfeatures',
+          let: { planId: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$plan_id', '$$planId'] } } },
+            {
+              $lookup: {
+                from: 'features',
+                localField: 'feature_id',
+                foreignField: '_id',
+                as: 'feature',
+              },
+            },
+            { $unwind: { path: '$feature', preserveNullAndEmptyArrays: true } },
+            { $replaceRoot: { newRoot: '$feature' } },
+            { $match: { _id: { $exists: true } } },
+            { $project: { name: 1, nameAr: 1, key: 1 } },
+          ],
+          as: 'linkedFeatures',
+        },
+      },
+      {
+        $project: {
+          name: 1,
+          nameAr: 1,
+          price: 1,
+          durationDays: 1,
+          description: 1,
+          descriptionAr: 1,
+          features: 1,
+          maxCompanies: 1,
+          maxDiscounts: 1,
+          maxScans: 1,
+          priority: 1,
+          popular: 1,
+          isActive: 1,
+          linkedFeatures: 1,
+        },
+      },
+    ])
 
     const enriched = plans.map(plan => ({
-      ...plan.toObject(),
-      features: featuresByPlan[plan._id] || [],
-    }));
+      ...plan,
+      features: [
+        ...(Array.isArray(plan.features) ? plan.features : []),
+        ...(plan.linkedFeatures || []),
+      ],
+      linkedFeatures: undefined,
+    }))
 
-    res.json({ success: true, data: enriched });
-  } catch (error) { next(error) }
-};
+    res.set('Cache-Control', 'public, max-age=300')
+    res.json({ success: true, data: enriched })
+  } catch (error) {
+    // Fallback to two-query approach if aggregation collection names differ
+    try {
+      const fallbackPlans = await SubscriptionPlan.find({ isActive: true })
+        .sort('priority')
+        .select('_id id name nameAr price durationDays description descriptionAr features maxCompanies maxDiscounts maxScans priority')
+        .lean()
+
+      const planIds = fallbackPlans.map(p => p._id)
+      const planFeatures = await PlanFeature.find({ plan_id: { $in: planIds } })
+        .populate('feature_id', 'name nameAr')
+        .lean()
+
+      const featuresByPlan = {}
+      planFeatures.forEach(pf => {
+        if (!featuresByPlan[pf.plan_id]) featuresByPlan[pf.plan_id] = []
+        if (pf.feature_id) featuresByPlan[pf.plan_id].push(pf.feature_id)
+      })
+
+      const enriched = fallbackPlans.map(plan => ({
+        ...plan,
+        features: featuresByPlan[plan._id] || [],
+      }))
+
+      res.set('Cache-Control', 'public, max-age=300')
+      res.json({ success: true, data: enriched })
+    } catch (fallbackError) {
+      next(fallbackError)
+    }
+  }
+}
 
 module.exports = { getPlans, getPlan, createPlan, updatePlan, deletePlan, getPlanFeatures, setPlanFeatures, getPlansWithFeatures }

@@ -1,72 +1,45 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { motion } from 'framer-motion'
 import { useLanguage } from '../context/LanguageContext'
 import PricingCard from '../components/PricingCard'
-import { getPlans, getPlanFeatures, getFeatures } from '../services/subscriptionsService'
+import { getPlansWithFeatures, peekPlansWithFeaturesCache } from '../services/subscriptionsService'
+import { buildPricingPlansFromApi, getStaticPricingPlans } from '../utils/pricingPlans'
+
+function resolveInitialPlans(t, ta, lang) {
+  const cached = peekPlansWithFeaturesCache()
+  if (cached?.length) {
+    return buildPricingPlansFromApi(cached, t, ta, lang)
+  }
+  return getStaticPricingPlans(t, ta)
+}
 
 export default function Pricing() {
-  const { t, ta } = useLanguage()
-  const [plans, setPlans] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { t, ta, lang } = useLanguage()
+  const staticPlans = useMemo(() => getStaticPricingPlans(t, ta), [t, ta])
+  const [plans, setPlans] = useState(() => resolveInitialPlans(t, ta, lang))
 
+  // Keep cards visible when language changes; merge cache/static immediately
   useEffect(() => {
-    async function load() {
-      try {
-        const plansRes = await getPlans()
+    setPlans(resolveInitialPlans(t, ta, lang))
+  }, [t, ta, lang])
+
+  // Refresh from API in background — never block the UI with a skeleton
+  useEffect(() => {
+    let cancelled = false
+
+    getPlansWithFeatures()
+      .then((plansRes) => {
         const rawPlans = plansRes?.data || []
-        const allFeaturesRes = await getFeatures()
-        const allFeatures = allFeaturesRes?.data || []
+        if (!cancelled && rawPlans.length > 0) {
+          setPlans(buildPricingPlansFromApi(rawPlans, t, ta, lang))
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPlans(staticPlans)
+      })
 
-        // Attach features to each plan
-        const enriched = await Promise.all(rawPlans.map(async (plan) => {
-          const pfRes = await getPlanFeatures(plan.id)
-          const pfData = pfRes?.data || []
-          const features = pfData
-            .map(pf => {
-              const feat = pf.feature || allFeatures.find(f => f.id === pf.feature_id)
-              return feat?.name || null
-            })
-            .filter(Boolean)
-
-          return {
-            id: plan.id,
-            name: plan.name,
-            price: String(plan.price),
-            period: plan.duration_months === 0 ? 'شهرية' : plan.duration_months > 1 ? `كل ${plan.duration_months} أشهر` : 'شهرية',
-            description: plan.name === 'مجاني' ? 'ابدأ رحلة التوفير' : `باقة ${plan.name}`,
-            features,
-            popular: plan.popular,
-          }
-        }))
-        setPlans(enriched)
-      } catch {
-        // Fallback to translation-based data
-        setPlans([
-          { name: t('pricing', 'freeName'), price: '0', period: t('pricing', 'monthly'), description: t('pricing', 'freeDesc'), features: ta('pricing', 'freeFeatures') },
-          { name: t('pricing', 'premiumName'), price: '99', period: t('pricing', 'monthly'), description: t('pricing', 'premiumDesc'), features: ta('pricing', 'premiumFeatures') },
-          { name: t('pricing', 'eliteName'), price: '199', period: t('pricing', 'monthly'), description: t('pricing', 'eliteDesc'), features: ta('pricing', 'eliteFeatures') },
-        ])
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [t, ta])
-
-  if (loading) {
-    return (
-      <section className="pt-32 pb-24 bg-white min-h-screen">
-        <div className="container mx-auto px-6 text-center">
-          <div className="animate-pulse space-y-4">
-            <div className="h-6 bg-gray-200 rounded w-24 mx-auto" />
-            <div className="h-10 bg-gray-200 rounded w-64 mx-auto" />
-            <div className="h-4 bg-gray-200 rounded w-96 mx-auto" />
-          </div>
-        </div>
-      </section>
-    )
-  }
+    return () => { cancelled = true }
+  }, [t, ta, lang, staticPlans])
 
   return (
     <>
