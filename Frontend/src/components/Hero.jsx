@@ -1,9 +1,10 @@
+import { memo } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Shield, Percent, Users, GraduationCap, Rocket } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 
-export default function Hero() {
+const Hero = memo(function Hero() {
   const { t } = useLanguage()
   const badges = [
     { icon: Shield, text: t('hero', 'badgeMedical') },
@@ -53,11 +54,17 @@ export default function Hero() {
             transition={{ duration: 0.6, delay: 0.3 }}
           >
             <div className="relative">
+              <picture>
+              <source srcSet="/Hero-img.webp" type="image/webp" />
+              <source srcSet="/Hero-img.png" type="image/png" />
               <img 
-                src="/img-hero.jpeg" 
+                src="/Hero-img.png" 
                 alt={t('hero', 'altText') || 'Freelancer Team'} 
+                width="800" height="500"
+                fetchpriority="high"
                 className="rounded-3xl shadow-2xl w-full object-cover h-[500px] border border-gold/20"
               />
+            </picture>
               <motion.div 
                 className="absolute -bottom-6 -left-6 bg-dark p-4 rounded-2xl shadow-xl border border-gold/30"
                 animate={{ y: [0, -10, 0] }}
@@ -94,4 +101,6 @@ export default function Hero() {
       </div>
     </section>
   )
-}
+})
+
+export default Hero

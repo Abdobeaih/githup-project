@@ -2,12 +2,17 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+  ],
   server: {
     port: 3000,
     open: true,
   },
   build: {
+    sourcemap: false,
+    minify: 'esbuild',
+    cssMinify: true,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -15,8 +20,6 @@ export default defineConfig({
           animations: ['framer-motion'],
           icons: ['lucide-react'],
           forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
-          state: ['zustand'],
-          api: ['axios', '@tanstack/react-query'],
         },
       },
     },

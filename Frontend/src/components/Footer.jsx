@@ -1,8 +1,9 @@
+import { memo } from 'react'
 import { Link } from 'react-router-dom'
 import { Twitter, Linkedin, Instagram, Facebook } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 
-export default function Footer() {
+const Footer = memo(function Footer() {
   const { t } = useLanguage()
   const socials = [
     { icon: Twitter, label: 'Twitter' },
@@ -15,7 +16,7 @@ export default function Footer() {
     <footer className="bg-dark text-goldLight/60 py-12 border-t border-gold/20">
       <div className="container mx-auto px-6 text-center">
         <div className="flex items-center justify-center gap-2 mb-4">
-          <img src="/Freelancer360.png" alt="Freelancer 360" className="h-16 w-auto" />
+          <img src="/Freelancer360.png" alt="Freelancer 360" width="200" height="64" loading="lazy" className="h-16 w-auto" />
         </div>
         <p className="mb-6">{t('footer', 'tagline')}</p>
         <div className="flex justify-center gap-6 mb-8">
@@ -35,4 +36,6 @@ export default function Footer() {
       </div>
     </footer>
   )
-}
+})
+
+export default Footer

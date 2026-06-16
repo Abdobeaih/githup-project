@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Menu, X, LayoutDashboard, LogOut, User, LogIn, Globe, Building2, Bell, CreditCard, ShieldCheck, Settings as SettingsIcon } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -6,7 +6,7 @@ import { useLanguage } from '../context/LanguageContext'
 import NotificationBell from './NotificationBell'
 import { USER_ROLES } from '../types/user'
 
-export default function Navbar() {
+const Navbar = memo(function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const location = useLocation()
@@ -34,7 +34,7 @@ export default function Navbar() {
     <nav aria-label="Main navigation" className="fixed top-0 w-full z-50 bg-dark/95 backdrop-blur-xl shadow-lg py-3">
       <div className="container mx-auto px-6 flex justify-between items-center">
         <Link to="/" className="flex items-center">
-          <img src="/Freelancer360.png" alt="Freelancer 360" className="h-16 w-auto" />
+          <img src="/Freelancer360.png" alt="Freelancer 360" width="200" height="64" className="h-16 w-auto" />
         </Link>
 
         <div className="hidden md:flex gap-8 items-center">
@@ -153,4 +153,6 @@ export default function Navbar() {
       )}
     </nav>
   )
-}
+})
+
+export default Navbar

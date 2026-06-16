@@ -6,7 +6,8 @@ import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 
 import Modal from '../../components/Modal'
-import { getUserEnrollments, confirmEnrollmentSubscription } from '../../data/db'
+import { getUserEnrollments, confirmEnrollmentSubscription, enrollUserInService } from '../../data/db'
+import { getMedicalCenters, getBanks } from '../../services/enrollmentService'
 import { QrCode, Wallet, CreditCard, Clock, TrendingUp, Sparkles, Stethoscope, Landmark, CheckCircle, Calendar, Phone, Shield, FileText } from 'lucide-react'
 
 export default function UserDashboard() {
@@ -16,6 +17,12 @@ export default function UserDashboard() {
   const [subModalOpen, setSubModalOpen] = useState(false)
   const [subSelectedEnr, setSubSelectedEnr] = useState(null)
   const [subForm, setSubForm] = useState({ dob: '', dataUseAgree: false, termsAgree: false })
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editEnrollment, setEditEnrollment] = useState(null)
+  const [editSelectedCenterId, setEditSelectedCenterId] = useState('')
+  const [editSelectedBankId, setEditSelectedBankId] = useState('')
+  const [editMedicalCenters, setEditMedicalCenters] = useState([])
+  const [editBanks, setEditBanks] = useState([])
 
   useEffect(() => {
     if (user) setEnrollments(getUserEnrollments(user.id))
@@ -54,6 +61,44 @@ export default function UserDashboard() {
       if (user) setEnrollments(getUserEnrollments(user.id))
     } catch (err) {
       console.error('[UserDashboard] Failed to confirm enrollment:', err)
+    }
+  }
+
+  const openEditModal = async (enr) => {
+    setEditEnrollment(enr)
+    setEditSelectedCenterId(enr.center_id || '')
+    setEditSelectedBankId(enr.bank_id || '')
+    const [centers, bks] = await Promise.all([
+      getMedicalCenters(),
+      getBanks(),
+    ])
+    setEditMedicalCenters(centers)
+    setEditBanks(bks)
+    setEditModalOpen(true)
+  }
+
+  const handleEditClose = () => {
+    setEditModalOpen(false)
+    setEditEnrollment(null)
+    setEditSelectedCenterId('')
+    setEditSelectedBankId('')
+  }
+
+  const handleEditSave = () => {
+    if (!editEnrollment || !user) return
+    const { service_type } = editEnrollment
+    const data = { service_type }
+    if (service_type === 'medical' || service_type === 'combined') data.center_id = editSelectedCenterId
+    if (service_type === 'financial' || service_type === 'combined') data.bank_id = editSelectedBankId
+    if (service_type === 'medical' && !editSelectedCenterId) return
+    if (service_type === 'financial' && !editSelectedBankId) return
+    if (service_type === 'combined' && (!editSelectedCenterId || !editSelectedBankId)) return
+    try {
+      enrollUserInService(user.id, data)
+      handleEditClose()
+      setEnrollments(getUserEnrollments(user.id))
+    } catch (err) {
+      console.error('[UserDashboard] Failed to update enrollment:', err)
     }
   }
 
@@ -221,12 +266,18 @@ export default function UserDashboard() {
                           </div>
                         </div>
                       </div>
-                      {enr.status === 'active' && !enr.subscription_confirmed && (
-                        <div className="mt-4 pt-4 border-t border-gold/10">
-                          <button type="button" onClick={() => openSubModal(enr)}
-                            className="w-full bg-gradient-to-r from-gold to-[#a67c3d] text-white font-bold text-sm py-2.5 px-4 rounded-xl hover:shadow-md transition-all">
-                            {t('common', 'confirmSubscription')}
+                      {enr.status === 'active' && (
+                        <div className="mt-4 pt-4 border-t border-gold/10 flex gap-2">
+                          <button type="button" onClick={() => openEditModal(enr)}
+                            className="flex-1 border border-gold/30 text-gold font-bold text-sm py-2.5 px-4 rounded-xl hover:bg-gold/5 transition-all">
+                            تغيير مقدم الخدمة
                           </button>
+                          {!enr.subscription_confirmed && (
+                            <button type="button" onClick={() => openSubModal(enr)}
+                              className="flex-1 bg-gradient-to-r from-gold to-[#a67c3d] text-white font-bold text-sm py-2.5 px-4 rounded-xl hover:shadow-md transition-all">
+                              {t('common', 'confirmSubscription')}
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -312,6 +363,79 @@ export default function UserDashboard() {
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}>
                 {t('common', 'confirmDiscountReceipt')}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit Enrollment Modal */}
+      {editModalOpen && editEnrollment && (
+        <Modal open={editModalOpen} onClose={handleEditClose}
+          title={editEnrollment.service_type === 'medical' ? 'تغيير المركز الطبي' : editEnrollment.service_type === 'financial' ? 'تغيير البنك' : 'تغيير مقدمي الخدمة'} size="md">
+          <div className="space-y-5">
+            {/* Current provider info */}
+            <div className="p-3 bg-gold/5 rounded-xl border border-gold/10">
+              <p className="text-dark/60 text-sm mb-1">مقدم الخدمة الحالي</p>
+              <p className="font-bold text-dark">
+                {td('medicalCenters', editEnrollment.center?.name, 'name') || td('banks', editEnrollment.bank?.name, 'name') || '—'}
+              </p>
+            </div>
+
+            {/* Medical center dropdown */}
+            {(editEnrollment.service_type === 'medical' || editEnrollment.service_type === 'combined') && (
+              <div>
+                <label className="block text-sm font-bold text-dark mb-1.5 flex items-center gap-2">
+                  <Stethoscope size={14} className="text-gold" />
+                  المركز الطبي
+                </label>
+                <select value={editSelectedCenterId} onChange={(e) => setEditSelectedCenterId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gold/20 bg-cream/30 text-dark focus:outline-none focus:ring-2 focus:ring-gold/40 appearance-none">
+                  <option value="">اختر المركز الطبي</option>
+                  {editMedicalCenters.map((c) => (
+                    <option key={c.id} value={c.id}>{td('medicalCenters', c.name, 'name')} — {c.governorate}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Bank dropdown */}
+            {(editEnrollment.service_type === 'financial' || editEnrollment.service_type === 'combined') && (
+              <div>
+                <label className="block text-sm font-bold text-dark mb-1.5 flex items-center gap-2">
+                  <Landmark size={14} className="text-gold" />
+                  البنك
+                </label>
+                <select value={editSelectedBankId} onChange={(e) => setEditSelectedBankId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gold/20 bg-cream/30 text-dark focus:outline-none focus:ring-2 focus:ring-gold/40 appearance-none">
+                  <option value="">اختر البنك</option>
+                  {editBanks.map((b) => (
+                    <option key={b.id} value={b.id}>{td('banks', b.name, 'name')} — {b.governorate}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={handleEditClose}
+                className="flex-1 border border-gold/30 text-dark font-bold text-sm py-3 rounded-xl hover:bg-gold/5 transition-all">
+                إلغاء
+              </button>
+              <button type="button" onClick={handleEditSave}
+                disabled={
+                  (editEnrollment.service_type === 'medical' && !editSelectedCenterId) ||
+                  (editEnrollment.service_type === 'financial' && !editSelectedBankId) ||
+                  (editEnrollment.service_type === 'combined' && (!editSelectedCenterId || !editSelectedBankId))
+                }
+                className={`flex-1 font-bold text-sm py-3 rounded-xl transition-all ${
+                  ((editEnrollment.service_type === 'medical' && !editSelectedCenterId) ||
+                   (editEnrollment.service_type === 'financial' && !editSelectedBankId) ||
+                   (editEnrollment.service_type === 'combined' && (!editSelectedCenterId || !editSelectedBankId)))
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-gold to-[#a67c3d] text-white hover:shadow-md'
+                }`}>
+                حفظ التغييرات
               </button>
             </div>
           </div>

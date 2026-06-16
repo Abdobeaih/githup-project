@@ -229,6 +229,7 @@ const translations = {
     // ── Multi-step wizard keys ────────────────────────────
     stepInfo: { ar: 'البيانات الشخصية', en: 'Personal Info' },
     stepPlan: { ar: 'اختيار الباقة', en: 'Choose Plan' },
+    stepService: { ar: 'اختيار الخدمات', en: 'Select Services' },
     stepPayment: { ar: 'طريقة الدفع', en: 'Payment Method' },
     next: { ar: 'التالي', en: 'Next' },
     back: { ar: 'السابق', en: 'Back' },

@@ -4,8 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
-import { getGovernorates } from '../data/db'
-import { User, Briefcase, Mail, Lock, ArrowLeft, MapPin, Check, Smartphone, CreditCard, Building2, QrCode, Shield, Zap, Crown, Phone, Globe, Link2, Store, ClipboardList, UserCheck, KeyRound, Loader2 } from 'lucide-react'
+import { getGovernorates, enrollUserInService } from '../data/db'
+import { getMedicalCenters, getBanks, getMedicalCentersByGovernorate, getBanksByGovernorate } from '../services/enrollmentService'
+import { User, Briefcase, Mail, Lock, ArrowLeft, MapPin, Check, Smartphone, CreditCard, Building2, QrCode, Shield, Zap, Crown, Phone, Globe, Link2, Store, ClipboardList, UserCheck, KeyRound, Loader2, Stethoscope, Landmark } from 'lucide-react'
 import { PasswordInput } from '../components/ui'
 import { USER_ROLES } from '../types/user'
 
@@ -50,11 +51,31 @@ export default function Signup() {
     companyBranchName: '', companyContactLink: '', companyWebsite: '',
     // Checkboxes
     hasCommercialReg: false, hasTaxCard: false,
-
+    // Insurance selection
+    medical_center_id: '', bank_id: '',
   })
+  const [medicalCenters, setMedicalCenters] = useState([])
+  const [banks, setBanks] = useState([])
   const [paymentMethod, setPaymentMethod] = useState('')
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
+
+  // Load insurance providers from API (with governorate filter)
+  useEffect(() => {
+    let cancelled = false
+    async function loadProviders() {
+      const gov = form.governorate
+      const [centers, bks] = gov
+        ? await Promise.all([getMedicalCentersByGovernorate(gov), getBanksByGovernorate(gov)])
+        : await Promise.all([getMedicalCenters(), getBanks()])
+      if (!cancelled) {
+        setMedicalCenters(centers)
+        setBanks(bks)
+      }
+    }
+    loadProviders()
+    return () => { cancelled = true }
+  }, [form.governorate])
 
   useEffect(() => {
     setGovernorates(getGovernorates())
@@ -68,6 +89,7 @@ export default function Signup() {
 
   const isUser = role === USER_ROLES.USER
   const isPaidPlan = form.plan === 'premium' || form.plan === 'elite'
+  const isElite = form.plan === 'elite'
   const specialties = ta('signup', 'specialties')
   const categories = ['medical', 'gym', 'food', 'fun']
 
@@ -84,16 +106,29 @@ export default function Signup() {
       if (!(form.name && form.email && form.job && form.password && form.governorate)) return false
       return Object.keys(getStep0Errors()).length === 0
     }
-    if (step === 1) return true
+    // Step 1: comprehensive (elite) requires both insurance selections
+    if (step === 1) {
+      if (isElite && (!form.medical_center_id || !form.bank_id)) return false
+      return true
+    }
     return true
   }
 
   const handleNext = () => {
     if (!canGoNext()) return
     if (step === 0) setFieldErrors(getStep0Errors())
-    if (step === 1 && !isPaidPlan) {
-      handleSubmit()
-      return
+    // Step 1: plan selection — free → submit, paid → validate insurance → payment
+    if (step === 1) {
+      if (!isPaidPlan) {
+        handleSubmit()
+        return
+      }
+      // Comprehensive (elite) — both insurance selections required
+      if (isElite && (!form.medical_center_id || !form.bank_id)) {
+        setError(lang === 'ar' ? 'يرجى اختيار مقدم التأمين الطبي والمالي' : 'Please select both medical and financial insurance providers')
+        return
+      }
+      setError('')
     }
     setStep(s => Math.min(s + 1, STEPS.length - 1))
   }
@@ -123,6 +158,15 @@ export default function Signup() {
       governorate: form.governorate,
     })
     if (result.success) {
+      // Enroll in selected insurance services for comprehensive (elite) plan
+      if (isElite) {
+        if (form.medical_center_id) {
+          enrollUserInService(result.user.id, { service_type: 'medical', center_id: form.medical_center_id })
+        }
+        if (form.bank_id) {
+          enrollUserInService(result.user.id, { service_type: 'financial', bank_id: form.bank_id })
+        }
+      }
       // Send verification OTP email and show OTP screen
       const otpResult = await sendSignupOtp(form.email, form.name, USER_ROLES.USER)
       if (otpResult.success) {
@@ -643,7 +687,7 @@ export default function Signup() {
                   </motion.div>
                 )}
 
-                {/* Step 1 — Choose Plan */}
+                {/* Step 1 — Choose Plan + Insurance Selection (paid only) */}
                 {step === 1 && (
                   <motion.div key="step1" custom={1} variants={slideVariants} initial="enter" animate="center" exit="exit" className="space-y-4">
                     <p className="text-goldLight/60 text-sm text-center mb-2">{t('signup', 'planLabel')}</p>
@@ -651,7 +695,7 @@ export default function Signup() {
                       const Icon = PLAN_ICONS[p]
                       const selected = form.plan === p
                       return (
-                        <button key={p} type="button" onClick={() => setForm({ ...form, plan: p })}
+                        <button key={p} type="button" onClick={() => { setForm({ ...form, plan: p }); setError('') }}
                           className={`w-full flex items-center gap-4 p-5 rounded-2xl border-2 text-right transition-all ${
                             selected ? 'border-gold bg-gold/10' : 'border-white/10 bg-white/5 hover:border-gold/30'
                           }`}>
@@ -676,13 +720,77 @@ export default function Signup() {
                       )
                     })}
 
+                    {/* Insurance selection — shown only for comprehensive (elite) plan */}
+                    {isElite && (
+                      <div className="pt-4 border-t border-gold/20 space-y-5">
+                        <p className="text-goldLight/60 text-sm text-center">
+                          {lang === 'ar' ? 'اختر مقدمي الخدمة للتأمين الطبي والمالي' : 'Choose your Medical and Financial Insurance providers'}
+                        </p>
+
+                        {/* ── Medical Insurance (dropdown) ── */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <Stethoscope size={16} className="text-gold" />
+                            <h3 className="font-bold text-white text-sm">
+                              {lang === 'ar' ? 'التأمين الطبي' : 'Medical Insurance'}
+                            </h3>
+                          </div>
+                          {medicalCenters.length === 0 ? (
+                            <p className="text-goldLight/40 text-xs text-center py-4">
+                              {lang === 'ar' ? 'لا توجد مراكز طبية متاحة في محافظتك' : 'No medical centers available in your governorate'}
+                            </p>
+                          ) : (
+                            <div className="relative">
+                              <Building2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gold/50 pointer-events-none" />
+                              <select name="medical_center_id" value={form.medical_center_id} onChange={handleChange}
+                                className="w-full bg-white/90 border-0 rounded-xl px-12 py-3.5 text-dark outline-none input-focus appearance-none cursor-pointer">
+                                <option value="">{lang === 'ar' ? '-- اختر مركزاً طبياً --' : '-- Select a medical center --'}</option>
+                                {medicalCenters.map(c => (
+                                  <option key={c.id} value={c.id}>
+                                    {td('companies', c.name)} — {c.city || c.governorate || ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* ── Financial Insurance (dropdown) ── */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <Landmark size={16} className="text-gold" />
+                            <h3 className="font-bold text-white text-sm">
+                              {lang === 'ar' ? 'التأمين المالي' : 'Financial Insurance'}
+                            </h3>
+                          </div>
+                          {banks.length === 0 ? (
+                            <p className="text-goldLight/40 text-xs text-center py-4">
+                              {lang === 'ar' ? 'لا توجد بنوك متاحة في محافظتك' : 'No banks available in your governorate'}
+                            </p>
+                          ) : (
+                            <div className="relative">
+                              <Landmark size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gold/50 pointer-events-none" />
+                              <select name="bank_id" value={form.bank_id} onChange={handleChange}
+                                className="w-full bg-white/90 border-0 rounded-xl px-12 py-3.5 text-dark outline-none input-focus appearance-none cursor-pointer">
+                                <option value="">{lang === 'ar' ? '-- اختر بنكاً --' : '-- Select a bank --'}</option>
+                                {banks.map(b => (
+                                  <option key={b.id} value={b.id}>
+                                    {td('companies', b.name)} — {b.city || b.governorate || ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                   </motion.div>
                 )}
 
                 {/* Step 2 — Payment Method */}
                 {step === 2 && (
-                  <motion.div key="step2" custom={1} variants={slideVariants} initial="enter" animate="center" exit="exit" className="space-y-4">
+                  <motion.div key="step3" custom={1} variants={slideVariants} initial="enter" animate="center" exit="exit" className="space-y-4">
                     {/* Plan summary */}
                     <div className="bg-gold/10 border border-gold/20 rounded-2xl p-4 text-center">
                       <p className="text-goldLight/60 text-xs">{t('signup', 'planLabel')}</p>

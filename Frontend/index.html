@@ -7,7 +7,11 @@
   <meta name="description" content="مستقلين - خدمات شاملة للفريلانسر في مصر والوطن العربي. تأمين طبي، تأمين مالي، خصومات، وكورسات تعليمية." />
   <meta name="keywords" content="فريلانسر, مستقلين, تأمين طبي, خصومات, كورسات, مصر" />
   <meta name="author" content="مستقلين" />
+  <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://mustakleen.com/" />
+  <link rel="alternate" hreflang="ar" href="https://mustakleen.com/" />
+  <link rel="alternate" hreflang="en" href="https://mustakleen.com/en/" />
+  <link rel="alternate" hreflang="x-default" href="https://mustakleen.com/" />
 
   <!-- Open Graph -->
   <meta property="og:title" content="مستقلين - خدمات الفريلانسر" />
@@ -24,10 +28,19 @@
   <meta name="twitter:description" content="أكثر من 75,000 فريلانسر يثقون بنا. حماية كاملة وخصومات حصرية." />
   <meta name="twitter:image" content="https://mustakleen.com/og-image.png" />
 
-  <!-- Preconnect & Fonts -->
+  <!-- Preconnect & DNS Prefetch -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://mustakleen.com" crossorigin>
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+
+  <!-- Preload critical assets -->
+  <link rel="preload" href="/Hero-img.png" as="image" fetchpriority="high">
+  <link rel="preload" href="/Freelancer360.png" as="image">
+
+  <!-- Fonts with swap strategy -->
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 
   <!-- JSON-LD Structured Data: Organization + WebSite -->
   <script type="application/ld+json">

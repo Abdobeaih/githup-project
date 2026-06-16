@@ -4,6 +4,7 @@ const express = require('express')
 const cors = require('cors')
 const morgan = require('morgan')
 const helmet = require('helmet')
+const compression = require('compression')
 const rateLimit = require('express-rate-limit')
 const connectDB = require('./config/db')
 const { errorHandler, notFound } = require('./middleware/errorMiddleware')
@@ -33,6 +34,9 @@ const app = express()
 
 // Security headers
 app.use(helmet())
+
+// Compression (gzip/brotli)
+app.use(compression())
 
 // CORS
 app.use(cors({

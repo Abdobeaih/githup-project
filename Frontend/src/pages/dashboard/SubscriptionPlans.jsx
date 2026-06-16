@@ -12,7 +12,8 @@ import { Crown, CheckCircle, Zap, Shield, AlertCircle, RefreshCw, CreditCard, Bu
 import Modal from '../../components/Modal'
 import { useNavigate } from 'react-router-dom'
 import { PLAN_IDS } from '../../types/subscription'
-import { enrollUserInService, getAllMedicalCenters, getAllBanks } from '../../data/db'
+import { enrollUserInService } from '../../data/db'
+import { getMedicalCenters, getBanks } from '../../services/enrollmentService'
 
 const planIcons = {
   free: Shield,
@@ -76,12 +77,12 @@ export default function SubscriptionPlans() {
   const [paymentStep, setPaymentStep] = useState(0) // 0 = method selection, 1 = input form
   const [paymentDetails, setPaymentDetails] = useState({})
 
-  // Service enrollment modal (for Elite plan)
+  // Service enrollment modal — shows plan details + both insurance dropdowns (elite only)
   const [showServiceModal, setShowServiceModal] = useState(false)
-  const [serviceType, setServiceType] = useState('') // 'medical' | 'financial'
-  const [serviceStep, setServiceStep] = useState(0) // 0 = choose type, 1 = choose center/bank
-  const [entitiesList, setEntitiesList] = useState([]) // medical centers or banks list
-  const [selectedEntityId, setSelectedEntityId] = useState(null)
+  const [medicalCenters, setMedicalCenters] = useState([])
+  const [banks, setBanks] = useState([])
+  const [selectedCenterId, setSelectedCenterId] = useState('')
+  const [selectedBankId, setSelectedBankId] = useState('')
 
   const PAYMENT_METHODS = [
     {
@@ -173,33 +174,18 @@ export default function SubscriptionPlans() {
 
   useEffect(() => { load() }, [load])
 
-  const resetServiceModal = () => {
-    setServiceType('')
-    setServiceStep(0)
-    setEntitiesList([])
-    setSelectedEntityId(null)
-    setShowServiceModal(false)
-  }
-
-  const handleServiceTypeSelect = (type) => {
-    setServiceType(type)
-    if (type === 'medical') {
-      setEntitiesList(getAllMedicalCenters())
-    } else {
-      setEntitiesList(getAllBanks())
+  // Load medical centers + banks for the elite service modal
+  useEffect(() => {
+    async function loadProviders() {
+      const [centers, bks] = await Promise.all([
+        getMedicalCenters(),
+        getBanks(),
+      ])
+      setMedicalCenters(centers)
+      setBanks(bks)
     }
-    setServiceStep(1)
-  }
-
-  const handleServiceEntitySelect = (entityId) => {
-    setSelectedEntityId(entityId)
-    // Proceed to payment
-    resetServiceModal()
-    setSelectedPaymentMethod('')
-    setPaymentStep(0)
-    setPaymentDetails({})
-    setShowPaymentModal(true)
-  }
+    loadProviders()
+  }, [])
 
   const handleSubscribe = (planId) => {
     if (planId === currentPlanId) {
@@ -211,15 +197,17 @@ export default function SubscriptionPlans() {
       return
     }
     const plan = plans.find(p => p.id === planId)
-    if (plan && plan.price > 0) {
-      // Premium plan shows service enrollment selection before payment
-      if (planId === PLAN_IDS.PREMIUM) {
-        setSelectedPlanId(planId)
-        resetServiceModal()
-        setShowServiceModal(true)
-        return
-      }
-      // Elite & other paid plans go directly to payment
+    if (!plan) return
+    if (plan.id === PLAN_IDS.ELITE) {
+      // Elite plan → show service modal with insurance dropdowns
+      setSelectedCenterId('')
+      setSelectedBankId('')
+      setSelectedPlanId(planId)
+      setShowServiceModal(true)
+      return
+    }
+    if (plan.price > 0) {
+      // Premium plan → go directly to payment
       setSelectedPlanId(planId)
       setSelectedPaymentMethod('')
       setPaymentStep(0)
@@ -239,14 +227,15 @@ export default function SubscriptionPlans() {
       const data = res?.data
       if (data && !data.error) {
         setCurrentPlanId(planId)
-        // Enroll in selected service (Premium only)
-        if (planId === PLAN_IDS.PREMIUM && selectedEntityId) {
-          const enrollPayload = serviceType === 'medical'
-            ? { service_type: 'medical', center_id: selectedEntityId }
-            : { service_type: 'financial', bank_id: selectedEntityId }
-          enrollUserInService(user.id, enrollPayload)
+        // Enroll in both medical + financial services only for elite plan with user's selections
+        if (planId === PLAN_IDS.ELITE) {
+          if (selectedCenterId) {
+            enrollUserInService(user.id, { service_type: 'medical', center_id: selectedCenterId })
+          }
+          if (selectedBankId) {
+            enrollUserInService(user.id, { service_type: 'financial', bank_id: selectedBankId })
+          }
         }
-        // Other plans (Elite, Free): no service enrollment
         refreshUser() // sync AuthContext with upgraded plan + enrollment
         setMessage({ type: 'success', text: 'تم الاشتراك بنجاح! مرحباً بك في الباقة الجديدة' })
       } else {
@@ -406,126 +395,122 @@ export default function SubscriptionPlans() {
         </div>
       </section>
 
-      {/* ── Service Enrollment Modal (Elite plan) ── */}
-      <Modal
-        open={showServiceModal}
-        onClose={resetServiceModal}
-        title={lang === 'ar' ? 'اختيار الخدمة' : 'Select Service'}
-        size="md"
-      >
-        {serviceStep === 0 ? (
-          /* Step 1: Choose service type */
-          <div className="space-y-4">
-            <p className="text-dark/60 text-sm text-center">
-              {lang === 'ar'
-                ? 'اختر الخدمة التي ترغب في الاشتراك بها مع باقة النخبة'
-                : 'Choose the service you want to enroll in with the Elite plan'}
-            </p>
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => handleServiceTypeSelect('medical')}
-                className="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-dark/10 bg-cream/30 hover:border-dark hover:bg-dark/5 transition-all text-center"
-              >
-                <div className="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
-                  <Stethoscope size={28} />
+      {/* ── Service Enrollment Modal — Plan details + Insurance dropdowns (elite only) ── */}
+      {(() => {
+        const selectedPlan = plans.find(p => p.id === selectedPlanId)
+        if (!selectedPlan) return null
+        const canProceed = selectedCenterId && selectedBankId
+        return (
+          <Modal
+            open={showServiceModal}
+            onClose={() => setShowServiceModal(false)}
+            title={lang === 'ar' ? 'اختيار مقدمي الخدمات التأمينية' : 'Choose Service Providers'}
+            size="md"
+          >
+            <div className="space-y-5">
+              {/* Plan details header */}
+              <div className="p-4 rounded-2xl bg-dark/5 border border-dark/10">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-dark text-white flex items-center justify-center">
+                    <Crown size={24} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-dark text-lg">{selectedPlan.name}</p>
+                    <p className="text-dark/60 text-sm">
+                      {selectedPlan.price} ر.س {lang === 'ar' ? '/ شهريًا' : '/month'}
+                    </p>
+                  </div>
                 </div>
-                <span className="font-bold text-dark">
-                  {lang === 'ar' ? 'التأمين الطبي' : 'Medical Insurance'}
-                </span>
-                <span className="text-dark/40 text-xs">
-                  {lang === 'ar' ? 'اشترك في تغطية طبية شاملة' : 'Comprehensive medical coverage'}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleServiceTypeSelect('financial')}
-                className="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-dark/10 bg-cream/30 hover:border-dark hover:bg-dark/5 transition-all text-center"
-              >
-                <div className="w-14 h-14 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
-                  <PiggyBank size={28} />
-                </div>
-                <span className="font-bold text-dark">
-                  {lang === 'ar' ? 'التأمين المالي' : 'Financial Insurance'}
-                </span>
-                <span className="text-dark/40 text-xs">
-                  {lang === 'ar' ? 'حماية دخلك ضد الظروف الطارئة' : 'Protect your income'}
-                </span>
-              </button>
-            </div>
-            <div className="flex justify-center pt-2">
-              <button
-                type="button"
-                onClick={resetServiceModal}
-                className="px-6 py-2.5 border-2 border-dark/30 text-dark font-bold rounded-xl hover:bg-dark/5 transition-all text-sm"
-              >
-                {lang === 'ar' ? 'إلغاء' : 'Cancel'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* Step 2: Choose center / bank */
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 mb-2">
-              <button
-                type="button"
-                onClick={() => { setServiceStep(0); setServiceType(''); setSelectedEntityId(null) }}
-                className="p-1.5 rounded-lg hover:bg-dark/10 text-dark transition-all"
-              >
-                <ArrowLeft size={18} />
-              </button>
-              <p className="text-dark/60 text-sm">
+              </div>
+
+              <p className="text-dark/60 text-sm text-center">
                 {lang === 'ar'
-                  ? `اختر ${serviceType === 'medical' ? 'المركز الطبي' : 'البنك'} المناسب`
-                  : `Choose the ${serviceType === 'medical' ? 'medical center' : 'bank'}`}
+                  ? 'باقة النخبة تشمل التأمين الطبي والمالي. يرجى اختيار مقدمي الخدمة:'
+                  : 'The Elite plan includes medical and financial insurance. Please select your providers:'}
               </p>
+
+              {/* Medical insurance dropdown */}
+              <div>
+                <label className="block text-sm font-bold text-dark mb-2 flex items-center gap-2">
+                  <Stethoscope size={18} className="text-emerald-600" />
+                  {lang === 'ar' ? 'التأمين الطبي' : 'Medical Insurance'}
+                  <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedCenterId}
+                  onChange={(e) => setSelectedCenterId(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-dark/20 bg-cream/30 text-dark focus:outline-none focus:ring-2 focus:ring-gold/40 appearance-none cursor-pointer"
+                >
+                  <option value="">{lang === 'ar' ? '-- اختر مركزاً طبياً --' : '-- Select a medical center --'}</option>
+                  {medicalCenters.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} - {c.governorate}</option>
+                  ))}
+                </select>
+                {selectedCenterId && (
+                  <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1">
+                    <CheckCircle size={12} />
+                    {lang === 'ar' ? 'تم اختيار مقدم التأمين الطبي' : 'Medical insurance provider selected'}
+                  </p>
+                )}
+              </div>
+
+              {/* Financial insurance dropdown */}
+              <div>
+                <label className="block text-sm font-bold text-dark mb-2 flex items-center gap-2">
+                  <PiggyBank size={18} className="text-amber-600" />
+                  {lang === 'ar' ? 'التأمين المالي' : 'Financial Insurance'}
+                  <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedBankId}
+                  onChange={(e) => setSelectedBankId(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-dark/20 bg-cream/30 text-dark focus:outline-none focus:ring-2 focus:ring-gold/40 appearance-none cursor-pointer"
+                >
+                  <option value="">{lang === 'ar' ? '-- اختر بنكاً --' : '-- Select a bank --'}</option>
+                  {banks.map(b => (
+                    <option key={b.id} value={b.id}>{b.name} - {b.governorate}</option>
+                  ))}
+                </select>
+                {selectedBankId && (
+                  <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1">
+                    <CheckCircle size={12} />
+                    {lang === 'ar' ? 'تم اختيار مقدم التأمين المالي' : 'Financial insurance provider selected'}
+                  </p>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowServiceModal(false)}
+                  className="flex-1 border-2 border-dark/30 text-dark font-bold py-3 px-4 rounded-xl hover:bg-dark/5 transition-all"
+                >
+                  {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  disabled={!canProceed}
+                  onClick={() => {
+                    setShowServiceModal(false)
+                    setSelectedPaymentMethod('')
+                    setPaymentStep(0)
+                    setPaymentDetails({})
+                    setShowPaymentModal(true)
+                  }}
+                  className={`flex-[2] font-bold py-3 px-4 rounded-xl transition-all ${
+                    canProceed
+                      ? 'bg-gradient-to-r from-dark to-darkLight text-white hover:shadow-lg hover:shadow-dark/20'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {lang === 'ar' ? 'متابعة إلى الدفع' : 'Continue to Payment'}
+                </button>
+              </div>
             </div>
-            <div className="max-h-80 overflow-y-auto space-y-3">
-              {entitiesList.length === 0 ? (
-                <p className="text-center text-dark/40 py-8">
-                  {lang === 'ar' ? 'لا توجد خيارات متاحة' : 'No options available'}
-                </p>
-              ) : (
-                entitiesList.map(entity => {
-                  const isSelected = selectedEntityId === entity.id
-                  return (
-                    <button
-                      key={entity.id}
-                      type="button"
-                      onClick={() => handleServiceEntitySelect(entity.id)}
-                      className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 text-right transition-all ${
-                        isSelected ? 'border-dark bg-dark/5' : 'border-dark/10 bg-cream/30 hover:border-dark/30'
-                      }`}
-                    >
-                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
-                        isSelected ? 'bg-dark text-white' : 'bg-dark/10 text-dark'
-                      }`}>
-                        {serviceType === 'medical' ? <Stethoscope size={20} /> : <Building2 size={20} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-dark text-sm truncate">{entity.name}</p>
-                        <div className="flex items-center gap-2 text-xs text-dark/50 mt-0.5">
-                          <MapPin size={11} />
-                          <span className="truncate">{entity.governorate}</span>
-                          {entity.rating && (
-                            <>
-                              <Star size={11} className="text-amber-500" />
-                              <span>{entity.rating}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <div className="w-5 h-5 rounded-full border-2 border-dark/20 flex items-center justify-center shrink-0">
-                        {isSelected ? <Check size={12} className="text-dark" /> : <ArrowLeft size={14} className="text-dark/40" />}
-                      </div>
-                    </button>
-                  )
-                })
-              )}
-            </div>
-          </div>
-        )}
-      </Modal>
+          </Modal>
+        )
+      })()}
 
       {/* Payment Gateway Modal — Dark theme (second color) */}
       <Modal
@@ -541,6 +526,23 @@ export default function SubscriptionPlans() {
         {paymentStep === 0 ? (
           /* ── Step 1: Payment Method Selection ── */
           <div className="space-y-4">
+            {/* Plan summary */}
+            {(() => {
+              const p = plans.find(pl => pl.id === selectedPlanId)
+              if (!p) return null
+              return (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-dark/5 border border-dark/10">
+                  <div className="w-10 h-10 rounded-lg bg-dark text-white flex items-center justify-center shrink-0">
+                    <Crown size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-dark text-sm">{p.name}</p>
+                    <p className="text-dark/50 text-xs">{p.price} ر.س {lang === 'ar' ? '/ شهريًا' : '/month'}</p>
+                  </div>
+                </div>
+              )
+            })()}
+
             <p className="text-dark/60 text-sm text-center">
               {lang === 'ar' ? 'يرجى اختيار طريقة الدفع للمتابعة' : 'Please select a payment method to continue'}
             </p>
@@ -593,9 +595,23 @@ export default function SubscriptionPlans() {
             if (!method) return null
             const Icon = method.icon
             const allFilled = method.fields.every(f => paymentDetails[f.name]?.trim())
+            const p = plans.find(pl => pl.id === selectedPlanId)
 
             return (
               <div className="space-y-5">
+                {/* Plan summary */}
+                {p && (
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-dark/5 border border-dark/10">
+                    <div className="w-10 h-10 rounded-lg bg-dark text-white flex items-center justify-center shrink-0">
+                      <Crown size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-dark text-sm">{p.name}</p>
+                      <p className="text-dark/50 text-xs">{p.price} ر.س {lang === 'ar' ? '/ شهريًا' : '/month'}</p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Method header */}
                 <div className="flex items-center gap-3 p-4 bg-dark/5 rounded-xl border border-dark/10">
                   <button
