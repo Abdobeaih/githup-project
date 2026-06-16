@@ -55,7 +55,6 @@ const Hero = memo(function Hero() {
           >
             <div className="relative">
               <picture>
-              <source srcSet="/Hero-img.webp" type="image/webp" />
               <source srcSet="/Hero-img.png" type="image/png" />
               <img 
                 src="/Hero-img.png" 
