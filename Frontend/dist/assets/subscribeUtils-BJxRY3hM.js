@@ -1,0 +1,1 @@
+function o(r,s,t){const e=new URLSearchParams;return e.set("service",r),s&&e.set("provider",s),t&&e.set("providerName",encodeURIComponent(t)),e}function a(r,s,{service:t,provider:e,providerName:c}){const i=o(t,e,c),n="/services/register";r(s?`${n}?${i.toString()}`:`/join?redirect=${n.slice(1)}&${i.toString()}`)}export{a as h};
