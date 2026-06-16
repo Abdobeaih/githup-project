@@ -137,7 +137,8 @@ export async function subscribe(data) {
     const res = await api.post("/subscriptions", data);
     return { data: res.data?.data || res.data };
   } catch {
-    return { data: db.createUserSubscription(data) };
+    // Normalize planId → plan_id for local db compatibility
+    return { data: db.createUserSubscription({ ...data, plan_id: data.plan_id || data.planId }) };
   }
 }
 
